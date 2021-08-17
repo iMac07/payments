@@ -126,6 +126,7 @@ public class CashierTrans {
                         ", IFNULL(c.sClientNm, '') sClientNm" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
                     " FROM Sales_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
@@ -133,6 +134,7 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sSalesman = c.sClientID" +
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
+                        " AND a.cTranStat IN ('0', '1')" +
                     " ORDER BY a.dTransact";
         }
         
