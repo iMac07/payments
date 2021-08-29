@@ -127,7 +127,7 @@ public class CashierTrans {
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
-                    " FROM Sales_Master a" +
+                    " FROM SP_Sales_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
                                 " AND a.sTransNox = b.sTransNox" + 

@@ -3,24 +3,20 @@ package org.xersys.payment.base;
 import com.mysql.jdbc.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
-import org.json.simple.JSONObject;
 import org.xersys.commander.contants.EditMode;
 import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
 import org.xersys.commander.iface.XNautilus;
 import org.xersys.commander.iface.XPaymentInfo;
 import org.xersys.commander.iface.XPayments;
-import org.xersys.commander.iface.XSearchRecord;
 import org.xersys.commander.util.MiscUtil;
 import org.xersys.commander.util.SQLUtil;
 import org.xersys.commander.util.StringUtil;
 
-public class SalesInvoice implements XPayments, XSearchRecord{
+public class SalesInvoice implements XPayments{
     private final String SOURCE_CODE = "SI";
     private final double VAT_RATE = 0.12;
     
@@ -50,7 +46,7 @@ public class SalesInvoice implements XPayments, XSearchRecord{
     }
     
     @Override
-    public boolean NewRecord() {
+    public boolean NewTransaction() {
         String lsProcName = this.getClass().getSimpleName() + ".NewRecord()";
         
         System.out.println(lsProcName);
@@ -117,7 +113,7 @@ public class SalesInvoice implements XPayments, XSearchRecord{
     }
 
     @Override
-    public boolean SaveRecord() {
+    public boolean SaveTransaction() {
         System.out.println(this.getClass().getSimpleName() + ".SaveRecord()");
         
         if (p_nEditMode != EditMode.ADDNEW &&
@@ -203,19 +199,19 @@ public class SalesInvoice implements XPayments, XSearchRecord{
     }
 
     @Override
-    public boolean UpdateRecord() {
+    public boolean UpdateTransaction() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
-    public boolean OpenRecord() {
+    public boolean OpenTransaction(String fsTransNox) {
         System.out.println(this.getClass().getSimpleName() + ".OpenRecord()");
         
         return true;
     }
     
     @Override
-    public boolean CloseRecord() {
+    public boolean CloseTransaction() {
         try {
             String lsSQL = "UPDATE Sales_Invoice SET" +
                                 "  cTranStat = '1'" +
@@ -242,11 +238,11 @@ public class SalesInvoice implements XPayments, XSearchRecord{
     }
 
     @Override
-    public boolean PrintRecord() {
+    public boolean PrintTransaction() {
         try {
             //print invoice here
             if ("0".equals((String) p_oMaster.getObject("cTranStat"))){
-                if (!CloseRecord()) return false;
+                if (!CloseTransaction()) return false;
             }
             
             p_nEditMode = EditMode.UNKNOWN;
@@ -396,16 +392,6 @@ public class SalesInvoice implements XPayments, XSearchRecord{
     @Override
     public String getMessage() {
         return p_sMessagex;
-    }
-
-    @Override
-    public JSONObject Search(Enum foType, String fsValue, String fsKey, String fsFilter, int fnMaxRow, boolean fbExact) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public JSONObject SearchRecord(String fsValue, String fsKey, String fsFilter, int fnMaxRow, boolean fbExact) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
     
     private boolean updateSource() throws SQLException{
@@ -575,7 +561,7 @@ public class SalesInvoice implements XPayments, XSearchRecord{
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
-                    " FROM Sales_Master a" +
+                    " FROM SP_Sales_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
