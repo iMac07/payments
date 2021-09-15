@@ -6,12 +6,17 @@ import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.xersys.commander.contants.EditMode;
 import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
 import org.xersys.commander.iface.XNautilus;
 import org.xersys.commander.iface.XPaymentInfo;
 import org.xersys.commander.util.MiscUtil;
+import org.xersys.parameters.search.ParamSearch;
 
 public class CreditCardTrans implements XPaymentInfo{
     private XNautilus p_oNautilus;
@@ -26,6 +31,8 @@ public class CreditCardTrans implements XPaymentInfo{
     
     private String p_sSourceNo;
     private String p_sSourceCd;
+    
+    private ParamSearch p_oBanks;
     
     public CreditCardTrans(){
         p_oNautilus = null;
@@ -47,6 +54,8 @@ public class CreditCardTrans implements XPaymentInfo{
         p_sMessagex = "";
         p_sSourceCd = "";
         p_sSourceNo = "";
+        
+        p_oBanks = new ParamSearch(p_oNautilus, ParamSearch.SearchType.searchBanks);
         
         p_nEditMode = EditMode.UNKNOWN;
     }
@@ -176,7 +185,7 @@ public class CreditCardTrans implements XPaymentInfo{
                     p_oDetail.updateObject("sSourceNo", p_sSourceNo);
                     p_oDetail.updateObject("dModified", p_oNautilus.getServerDate());
 
-                    lsSQL = MiscUtil.rowset2SQL(p_oDetail, "Credit_Card_Trans", "xTermnlNm;sBankName");
+                    lsSQL = MiscUtil.rowset2SQL(p_oDetail, "Credit_Card_Trans", "sBankName");
                     
                     if (lsSQL.equals("")){
                         if (!p_bWithParent) p_oNautilus.rollbackTrans();
@@ -252,10 +261,8 @@ public class CreditCardTrans implements XPaymentInfo{
             p_oDetail.absolute(fnRow);
             
             switch (fsFieldNm){
-                case "xTermnlNm":
-                    return p_oDetail.getObject(18);
                 case "sBankName":
-                    return p_oDetail.getObject(19);
+                    return p_oDetail.getObject(18);
                 default:
                     return p_oDetail.getObject(fsFieldNm);
             }
@@ -289,7 +296,6 @@ public class CreditCardTrans implements XPaymentInfo{
             
             switch (fsFieldNm){
                 case "sTermnlID":
-                case "sBankCode":
                 case "sCardNoxx":
                 case "sApprovNo":
                 case "sTermCode":
@@ -305,18 +311,8 @@ public class CreditCardTrans implements XPaymentInfo{
                     p_oListener.MasterRetreive(fsFieldNm, foValue);
                     p_oListener.MasterRetreive("nPaymTotl", getPaymentTotal());
                     break;
-                case "xTermnlNm":
-                    p_oDetail.updateObject(18, foValue);
-                    p_oDetail.updateRow();
-                    
-                    p_oListener.MasterRetreive(fsFieldNm, foValue);
-                    break;
-                case "sBankName":
-                    p_oDetail.updateObject(19, foValue);
-                    p_oDetail.updateRow();
-                    
-                    p_oListener.MasterRetreive(fsFieldNm, foValue);
-                    break;
+                case "sBankCode":
+                    getBank((String) foValue);
             }        
         } catch (SQLException e) {
             e.printStackTrace();
@@ -382,6 +378,57 @@ public class CreditCardTrans implements XPaymentInfo{
         }
     }
     
+    public JSONObject searchBanks(String fsKey, Object foValue, String fsFilter, String fsValue, boolean fbExact){
+        p_oBanks.setKey(fsKey);
+        p_oBanks.setValue(foValue);
+        p_oBanks.setExact(fbExact);
+        
+        return p_oBanks.Search();
+    }
+    
+    public ParamSearch getSearchBanks(){
+        return p_oBanks;
+    }
+    
+    private void getBank(String foValue){
+        String lsProcName = this.getClass().getSimpleName() + ".getBank()";
+        
+        JSONObject loJSON = searchBanks("sBankCode", foValue, "", "", true);
+        if ("success".equals((String) loJSON.get("result"))){
+            try {
+                JSONParser loParser = new JSONParser();
+
+                try {
+                    JSONArray loArray = (JSONArray) loParser.parse((String) loJSON.get("payload"));
+
+                    switch (loArray.size()){
+                        case 0:
+                            p_oDetail.updateObject("sBankCode", "");
+                            p_oDetail.updateObject("sBankName", "");
+                            p_oDetail.updateRow();
+                            break;
+                        default:
+                            loJSON = (JSONObject) loArray.get(0);
+                            p_oDetail.updateObject("sBankCode", (String) loJSON.get("sBankCode"));
+                            p_oDetail.updateObject("sBankName", (String) loJSON.get("sBankName"));
+                            p_oDetail.updateRow();
+                    }
+                } catch (ParseException ex) {
+                    ex.printStackTrace();
+                    p_oListener.MasterRetreive("sBankCode", "");
+                    p_oListener.MasterRetreive("sBankName", "");
+                    p_oDetail.updateRow();
+                }
+
+                p_oListener.MasterRetreive("sBankCode", (String) p_oDetail.getObject("sBankCode"));
+                p_oListener.MasterRetreive("sBankName", (String) p_oDetail.getObject("sBankName"));
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                setMessage("SQLException on " + lsProcName + ". Please inform your System Admin.");
+            }
+        }
+    }
+    
     private String getSQ_Detail(){
         return "SELECT" +
                     "  a.sTransNox" +
@@ -401,11 +448,9 @@ public class CreditCardTrans implements XPaymentInfo{
                     ", a.nAmtPaidx" +
                     ", a.cTranStat" +
                     ", a.dModified" +
-                    ", b.sBankName xTermnlNm" +
-                    ", c.sBankName" +
+                    ", b.sBankName" +
                 " FROM Credit_Card_Trans a" +
-                    " LEFT JOIN Banks b ON a.sTermnlID = b.sBankCode" +
-                    " LEFT JOIN Banks c ON a.sBankCode = b.sBankCode";
+                    " LEFT JOIN Banks b ON a.sBankCode = b.sBankCode";
     }
     
     private void setMessage(String fsValue){
