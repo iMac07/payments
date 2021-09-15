@@ -9,6 +9,8 @@ public class PaymentFactory {
         switch (fsValue){
             case InvoiceType.SALES_INVOICE:
                 return new SalesInvoice(foNautilus, fsBranchCd, fbWithParent);
+            case InvoiceType.NO_INVOICE:
+                return new NoInvoice(foNautilus, fsBranchCd, fbWithParent);
             default:
                 return null;
         }
