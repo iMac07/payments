@@ -16,7 +16,7 @@ import org.xersys.commander.iface.LRecordMas;
 import org.xersys.commander.iface.XNautilus;
 import org.xersys.commander.iface.XPaymentInfo;
 import org.xersys.commander.util.MiscUtil;
-import org.xersys.parameters.search.ParamSearch;
+import org.xersys.parameters.search.ParamSearchF;
 
 public class CreditCardTrans implements XPaymentInfo{
     private XNautilus p_oNautilus;
@@ -32,7 +32,7 @@ public class CreditCardTrans implements XPaymentInfo{
     private String p_sSourceNo;
     private String p_sSourceCd;
     
-    private ParamSearch p_oBanks;
+    private ParamSearchF p_oBanks;
     
     public CreditCardTrans(){
         p_oNautilus = null;
@@ -55,7 +55,7 @@ public class CreditCardTrans implements XPaymentInfo{
         p_sSourceCd = "";
         p_sSourceNo = "";
         
-        p_oBanks = new ParamSearch(p_oNautilus, ParamSearch.SearchType.searchBanks);
+        p_oBanks = new ParamSearchF(p_oNautilus, ParamSearchF.SearchType.searchBanks);
         
         p_nEditMode = EditMode.UNKNOWN;
     }
@@ -386,7 +386,7 @@ public class CreditCardTrans implements XPaymentInfo{
         return p_oBanks.Search();
     }
     
-    public ParamSearch getSearchBanks(){
+    public ParamSearchF getSearchBanks(){
         return p_oBanks;
     }
     
