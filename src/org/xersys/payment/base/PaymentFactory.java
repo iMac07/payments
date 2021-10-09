@@ -11,6 +11,8 @@ public class PaymentFactory {
                 return new SalesInvoice(foNautilus, fsBranchCd, fbWithParent);
             case InvoiceType.NO_INVOICE:
                 return new NoInvoice(foNautilus, fsBranchCd, fbWithParent);
+            case InvoiceType.CHARGE_INVOICE:
+                return new ChargeInvoice(foNautilus, fsBranchCd, fbWithParent);
             default:
                 return null;
         }

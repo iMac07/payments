@@ -6,7 +6,13 @@ import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import org.xersys.clients.search.ClientSearch;
 import org.xersys.commander.contants.EditMode;
+import org.xersys.commander.contants.RecordStatus;
 import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
 import org.xersys.commander.iface.XNautilus;
@@ -17,29 +23,34 @@ import org.xersys.commander.util.SQLUtil;
 import org.xersys.commander.util.StringUtil;
 
 public class SalesInvoice implements XPayments{
-    private final String SOURCE_CODE = "SI";
     private final double VAT_RATE = 0.12;
     
-    private XNautilus p_oNautilus;
+    private final XNautilus p_oNautilus;
+    private final boolean p_bWithParent;
+    private final String p_sBranchCd;
+    
     private LRecordMas p_oListener;
     
-    private String p_sBranchCd;
     private String p_sMessagex;
     private String p_sSourceNo;
     private String p_sSourceCd;
     
     private int p_nEditMode;
-    private boolean p_bWithParent;
     
     private CachedRowSet p_oMaster;
     private XPaymentInfo p_oCard;
     private XPaymentInfo p_oCheque;
     private XPaymentInfo p_oGC;
     
+    private ClientSearch p_oSearchClient;
+    
     public SalesInvoice(XNautilus foNautilus, String fsBranchCd, boolean fbWithParent){
         p_oNautilus = foNautilus;
         p_sBranchCd = fsBranchCd;
         p_bWithParent = fbWithParent;
+        
+        
+        p_oSearchClient = new ClientSearch(p_oNautilus, ClientSearch.SearchType.searchClient);
         
         p_sSourceCd = "";
         p_sSourceNo = "";
@@ -129,9 +140,15 @@ public class SalesInvoice implements XPayments{
                 return false;
             }
             
+            p_oMaster.first();
+            if (p_oMaster.getString("sClientID").isEmpty()){
+                setMessage("Client must not be empty.");
+                return false;
+            }
+            
             if (!p_bWithParent) p_oNautilus.beginTrans();
         
-            if ("".equals((String) getMaster("sTransNox"))){ //new record
+            if (p_nEditMode == EditMode.ADDNEW){
                 Connection loConn = getConnection();
 
                 p_oMaster.updateObject("sTransNox", MiscUtil.getNextCode("Sales_Invoice", "sTransNox", true, loConn, p_sBranchCd));
@@ -162,7 +179,8 @@ public class SalesInvoice implements XPayments{
                 }
                 
                 lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Sales_Invoice", "sClientNm;nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
-            } else { //old record
+            } else {
+                
             }
             
             if (lsSQL.equals("")){
@@ -295,9 +313,7 @@ public class SalesInvoice implements XPayments{
                     p_oListener.MasterRetreive(fsFieldNm, p_oMaster.getObject(fsFieldNm));
                     break;
                 case "sClientID":
-                    p_oListener.MasterRetreive("sClientNm", "");
-                    p_oListener.MasterRetreive("sAddressx", "");
-                    p_oListener.MasterRetreive("sTINumber", "");
+                    getClient("a.sClientID", foValue);
                     break;
                 case "nVATSales":
                 case "nVATAmtxx":
@@ -328,7 +344,7 @@ public class SalesInvoice implements XPayments{
 
                     p_oListener.MasterRetreive(fsFieldNm, p_oMaster.getObject(fsFieldNm));
             }
-        } catch (SQLException e) {
+        } catch (SQLException | ParseException e) {
             e.printStackTrace();
             setMessage("SQLException when assigning value to master record.");
         }
@@ -391,6 +407,36 @@ public class SalesInvoice implements XPayments{
     @Override
     public String getMessage() {
         return p_sMessagex;
+    }
+    
+    @Override
+    public JSONObject searchClient(String fsKey, Object foValue, boolean fbExact){
+        p_oSearchClient.setKey(fsKey);
+        p_oSearchClient.setValue(foValue);
+        p_oSearchClient.setExact(fbExact);
+        
+        return p_oSearchClient.Search();
+    }
+    
+    @Override
+    public ClientSearch getSearchClient(){
+        return p_oSearchClient;
+    }
+    
+    private void getClient(String fsFieldNm, Object foValue) throws SQLException, ParseException{       
+        JSONObject loJSON = searchClient(fsFieldNm, foValue, true);
+        JSONParser loParser = new JSONParser();
+
+        if ("success".equals((String) loJSON.get("result"))){
+            loJSON = (JSONObject) ((JSONArray) loParser.parse((String) loJSON.get("payload"))).get(0);
+
+            p_oMaster.first();
+            p_oMaster.updateObject("sClientID", (String) loJSON.get("sClientID"));
+            p_oMaster.updateObject("sClientNm", (String) loJSON.get("sClientNm"));
+            p_oMaster.updateRow();            
+            
+            if (p_oListener != null) p_oListener.MasterRetreive("sClientID", (String) p_oMaster.getObject("sClientNm"));
+        }
     }
     
     private boolean updateSource() throws SQLException{
@@ -481,9 +527,6 @@ public class SalesInvoice implements XPayments{
     private double computePaymentTotal() throws SQLException{
         return (double) p_oMaster.getObject("nCashAmtx") +
                             p_oCard.getPaymentTotal();
-        
-//                        p_oCheque.getPaymentTotal() +
-//                        p_oGC.getPaymentTotal();
     }
     
     private void computeTax() throws SQLException{
