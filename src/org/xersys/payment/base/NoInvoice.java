@@ -6,8 +6,8 @@ import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
+import org.json.simple.JSONObject;
 import org.xersys.commander.contants.EditMode;
-import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
 import org.xersys.commander.iface.XNautilus;
 import org.xersys.commander.iface.XPaymentInfo;
@@ -355,9 +355,6 @@ public class NoInvoice implements XPayments{
     private double computePaymentTotal() throws SQLException{
         return p_nCashAmtx +
                 p_oCard.getPaymentTotal();
-        
-//                        p_oCheque.getPaymentTotal() +
-//                        p_oGC.getPaymentTotal();
     }
     
     private String getSQ_Master(){
@@ -394,5 +391,15 @@ public class NoInvoice implements XPayments{
         }
         
         return lsSQL;
+    }
+
+    @Override
+    public JSONObject searchClient(String fsKey, Object foValue, boolean fbExact) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public Object getSearchClient() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }

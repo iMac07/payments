@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
+import org.json.simple.JSONObject;
 import org.xersys.commander.contants.EditMode;
 import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
@@ -15,24 +16,21 @@ import org.xersys.commander.iface.XPayments;
 import org.xersys.commander.util.MiscUtil;
 import org.xersys.commander.util.SQLUtil;
 
-public class ChargeInvoice implements XPayments{
-    private final String SOURCE_CODE = "CI";
+public class ChargeInvoice implements XPayments{    
+    private final String MASTER_TABLE = "Charge_Invoice";
     
-    private XNautilus p_oNautilus;
+    private final XNautilus p_oNautilus;
+    private final boolean p_bWithParent;
+    private final String p_sBranchCd;
+    
     private LRecordMas p_oListener;
-    
-    private String p_sBranchCd;
     private String p_sMessagex;
     private String p_sSourceNo;
     private String p_sSourceCd;
     
     private int p_nEditMode;
-    private boolean p_bWithParent;
     
     private CachedRowSet p_oMaster;
-    private XPaymentInfo p_oCard;
-    private XPaymentInfo p_oCheque;
-    private XPaymentInfo p_oGC;
     
     public ChargeInvoice(XNautilus foNautilus, String fsBranchCd, boolean fbWithParent){
         p_oNautilus = foNautilus;
@@ -59,25 +57,41 @@ public class ChargeInvoice implements XPayments{
             return false;
         }
         
-        try {
-            RowSetFactory factory = RowSetProvider.newFactory();
+        String lsSQL = getSQ_Source();
+        ResultSet loRS1 = p_oNautilus.executeQuery(lsSQL);
+        
+        if (MiscUtil.RecordCount(loRS1) != 0) {
+            try {
+                RowSetFactory factory = RowSetProvider.newFactory();
 
-            //create empty master record
-            String lsSQL = MiscUtil.addCondition(getSQ_Master(), "0=1");
-            ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
-            p_oMaster = factory.createCachedRowSet();
-            p_oMaster.populate(loRS);
-            MiscUtil.close(loRS);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            setMessage("SQL Exception on " + lsProcName); 
-            p_nEditMode = EditMode.UNKNOWN;
-            return false;
+                //create empty master record
+                lsSQL = MiscUtil.addCondition(getSQ_Master(), "0=1");
+                ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
+                p_oMaster = factory.createCachedRowSet();
+                p_oMaster.populate(loRS);
+                MiscUtil.close(loRS);
+                addMasterRow();     
+                
+                loRS1.first();
+                p_oMaster.last();               
+                p_oMaster.updateObject("nAmountxx", loRS1.getDouble("nTranTotl"));                 
+                p_oMaster.updateRow();
+                MiscUtil.close(loRS1);
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                setMessage("SQL Exception on " + lsProcName); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+
+            p_nEditMode = EditMode.ADDNEW;
+
+            return true;
         }
-
-        p_nEditMode = EditMode.ADDNEW;
-
-        return true;
+        
+        setMessage("No record to open.");
+        p_nEditMode = EditMode.UNKNOWN;
+        return false;        
     }
 
     @Override
@@ -91,34 +105,34 @@ public class ChargeInvoice implements XPayments{
         }       
         
         String lsSQL = "";
-        try {            
+        try {           
+            p_oMaster.first();
+            if (p_oMaster.getString("sClientID").isEmpty()){
+                setMessage("Client must not be empty.");
+                return false;
+            }
+
             if (!p_bWithParent) p_oNautilus.beginTrans();
         
-            if ("".equals((String) getMaster("sTransNox"))){ //new record
+            if (p_nEditMode == EditMode.ADDNEW){
                 Connection loConn = getConnection();
 
-                p_oMaster.updateObject("sTransNox", MiscUtil.getNextCode("Sales_Invoice", "sTransNox", true, loConn, p_sBranchCd));
+                p_oMaster.updateObject("sTransNox", MiscUtil.getNextCode(MASTER_TABLE, "sTransNox", true, loConn, p_sBranchCd));
                 p_oMaster.updateObject("sSourceCd", p_sSourceCd);
                 p_oMaster.updateObject("sSourceNo", p_sSourceNo);
                 p_oMaster.updateObject("dModified", p_oNautilus.getServerDate());
                 p_oMaster.updateRow();
                 
                 if (!p_bWithParent) MiscUtil.close(loConn);          
-                
-                //save the credit card info
-                if (p_oCard.getPaymentTotal() > 0.00){
-                    p_oCard.setSourceCd(SOURCE_CODE);
-                    p_oCard.setSourceNo((String) p_oMaster.getObject("sTransNox"));
-                    
-                    if (!p_oCard.SaveTransaction()){
-                        if (!p_bWithParent) p_oNautilus.rollbackTrans();
-                        setMessage(p_oCard.getMessage());
-                        return false;
-                    }
+
+                if (!updateSource()) {
+                    if (!p_bWithParent) p_oNautilus.rollbackTrans();
+                    return false;
                 }
                 
-                lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Charge_Invoice", "sClientNm");
+                lsSQL = MiscUtil.rowset2SQL(p_oMaster, MASTER_TABLE, "sClientNm");
             } else { //old record
+                
             }
             
             if (lsSQL.equals("")){
@@ -128,7 +142,7 @@ public class ChargeInvoice implements XPayments{
                 return false;
             }
             
-            if(p_oNautilus.executeUpdate(lsSQL, "Sales_Invoice", p_sBranchCd, "") <= 0){
+            if(p_oNautilus.executeUpdate(lsSQL, MASTER_TABLE, p_sBranchCd, "") <= 0){
                 if(!p_oNautilus.getMessage().isEmpty())
                     setMessage(p_oNautilus.getMessage());
                 else
@@ -155,25 +169,29 @@ public class ChargeInvoice implements XPayments{
 
     @Override
     public boolean UpdateTransaction() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        if (p_nEditMode != EditMode.READY) return false;
+        
+        p_nEditMode = EditMode.UPDATE;
+        return true;
     }
 
     @Override
     public boolean OpenTransaction(String fsTransNox) {
         System.out.println(this.getClass().getSimpleName() + ".OpenRecord()");
         
+        p_nEditMode = EditMode.READY;
         return true;
     }
     
     @Override
-    public boolean CloseTransaction() {
+    public boolean CloseTransaction() {        
         try {
-            String lsSQL = "UPDATE Charge_Invoice SET" +
+            String lsSQL = "UPDATE " + MASTER_TABLE + " SET" +
                                 "  cTranStat = '1'" +
                                 ", dModified = " + SQLUtil.toSQL(p_oNautilus.getServerDate()) +
                             " WHERE sTransNox = " + SQLUtil.toSQL((String) p_oMaster.getObject("sTransNox"));
             
-            if(p_oNautilus.executeUpdate(lsSQL, "Charge_Invoice", p_sBranchCd, "") <= 0){
+            if(p_oNautilus.executeUpdate(lsSQL, MASTER_TABLE, p_sBranchCd, "") <= 0){
                 if(!p_oNautilus.getMessage().isEmpty())
                     setMessage(p_oNautilus.getMessage());
                 else
@@ -194,7 +212,7 @@ public class ChargeInvoice implements XPayments{
 
     @Override
     public boolean PrintTransaction() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return true;
     }
     
     @Override
@@ -214,21 +232,15 @@ public class ChargeInvoice implements XPayments{
     
     @Override
     public void setMaster(String fsFieldNm, Object foValue) {
-        try {
-            if (p_nEditMode != EditMode.ADDNEW &&
-                p_nEditMode != EditMode.UPDATE){
-                System.err.println("Transaction is not on update mode.");
-                return;
-            }
+        if (p_nEditMode != EditMode.ADDNEW){
+            System.err.println("Transaction is not on update mode.");
+            return;
+        }
 
-            p_oMaster.first();
-            p_oMaster.updateObject(fsFieldNm, foValue);
-            p_oMaster.updateRow();
-
-            p_oListener.MasterRetreive(fsFieldNm, p_oMaster.getObject(fsFieldNm));
-        } catch (SQLException e) {
-            e.printStackTrace();
-            setMessage("SQLException when assigning value to master record.");
+        switch (fsFieldNm){
+            case "sClientID":
+                
+                break;
         }
     }
 
@@ -237,15 +249,146 @@ public class ChargeInvoice implements XPayments{
         try {
             p_oMaster.first();
             switch (fsFieldNm){
-                default:
+                case "sClientID":
+                    return "";
+                case "nAmountxx":
                     return p_oMaster.getObject(fsFieldNm);
+                default:
+                    return null;
             }
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-            setMessage("SQLException when retreiving value to master record.");
-            return null;
+        } catch (SQLException ex) {
+            ex.printStackTrace();
         }
+        return null;
+    }
+
+    @Override
+    public String getMessage() {
+        return p_sMessagex;
+    }
+    
+    private boolean updateSource() throws SQLException{
+        String lsSQL;
+        ResultSet loRS;
+        
+        switch(p_sSourceCd){
+            case "SO":
+                lsSQL = "SELECT" +
+                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
+                        " FROM SP_Sales_Master" +
+                        " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                
+                loRS = p_oNautilus.executeQuery(lsSQL);
+                if (loRS.next()){                    
+                    lsSQL = "UPDATE SP_Sales_Master SET" +
+                            "  nAmtPaidx = nAmtPaidx + " + loRS.getDouble("xPayablex");
+                    
+                    if (loRS.getDouble("xPayablex") <= loRS.getDouble("xPayablex"))
+                        lsSQL += ", cTranStat = '2'";
+                    else 
+                        lsSQL += ", cTranStat = '1'";
+                    
+                    lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
+                    
+                    MiscUtil.close(loRS);
+                    
+                    if (!lsSQL.isEmpty()){
+                        if(p_oNautilus.executeUpdate(lsSQL, "SP_Sales_Master", p_sBranchCd, "") <= 0){
+                            if(!p_oNautilus.getMessage().isEmpty())
+                                setMessage(p_oNautilus.getMessage());
+                            else
+                                setMessage("No record updated");
+
+                            return false;
+                        }
+
+                        return true;
+                    }
+                }
+                break;
+        }
+        
+        setMessage("Unable to update source transaction.");
+        return false;
+    }
+    
+    private Connection getConnection(){         
+        Connection foConn;
+        
+        if (p_bWithParent){
+            foConn = (Connection) p_oNautilus.getConnection().getConnection();
+            
+            if (foConn == null) foConn = (Connection) p_oNautilus.doConnect();
+        } else 
+            foConn = (Connection) p_oNautilus.doConnect();
+        
+        return foConn;
+    }
+    
+    private void setMessage(String fsValue){
+        p_sMessagex = fsValue;
+    }
+    
+    private void addMasterRow() throws SQLException{
+        p_oMaster.last();
+        p_oMaster.moveToInsertRow();
+        
+        MiscUtil.initRowSet(p_oMaster);
+        p_oMaster.updateObject("cBilledxx", "0");
+        p_oMaster.updateObject("cPaidxxxx", "0");
+        p_oMaster.updateObject("cWaivexxx", "0");
+        p_oMaster.updateObject("cTranStat", TransactionStatus.STATE_OPEN);
+        
+        p_oMaster.insertRow();
+        p_oMaster.moveToCurrentRow();
+    }
+    
+    private String getSQ_Master(){
+        return "SELECT" +
+                    "  a.sTransNox" +
+                    ", a.sClientID" +
+                    ", a.cBilledxx" +
+                    ", a.dBilledxx" +
+                    ", a.cPaidxxxx" +
+                    ", a.dPaidxxxx" +
+                    ", a.cWaivexxx" +
+                    ", a.dWaivexxx" +
+                    ", a.sWaivexxx" +
+                    ", a.nAmountxx" +	
+                    ", a.nAmtPaidx" +	
+                    ", a.sSourceCd" +	
+                    ", a.sSourceNo" +	
+                    ", a.cTranStat" +
+                    ", a.dModified" +
+                    ", b.sClientNm" +
+                " FROM Charge_Invoice a" +
+                    " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID";
+    }
+    
+    private String getSQ_Source(){
+        String lsSQL = "";
+        
+        if (p_sSourceCd.contains("SO")){
+            lsSQL = "SELECT" +
+                        "  IFNULL(c.sClientNm, '') sClientNm" +
+                        ", a.nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nAmtPaidx" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", a.sClientID" +
+                    " FROM SP_Sales_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'SO'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                        " LEFT JOIN Client_Master c" + 
+                            " ON a.sSalesman = c.sClientID" +
+                    " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+        }
+        
+        return lsSQL;
     }
     
     @Override
@@ -279,63 +422,12 @@ public class ChargeInvoice implements XPayments{
     }
 
     @Override
-    public String getMessage() {
-        return p_sMessagex;
+    public JSONObject searchClient(String fsKey, Object foValue, boolean fbExact) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-    
-    private Connection getConnection(){         
-        Connection foConn;
-        
-        if (p_bWithParent){
-            foConn = (Connection) p_oNautilus.getConnection().getConnection();
-            
-            if (foConn == null) foConn = (Connection) p_oNautilus.doConnect();
-        } else 
-            foConn = (Connection) p_oNautilus.doConnect();
-        
-        return foConn;
-    }
-    
-    private void setMessage(String fsValue){
-        p_sMessagex = fsValue;
-    }
-    
-    private void addMasterRow() throws SQLException{
-        p_oMaster.last();
-        p_oMaster.moveToInsertRow();
-        
-        MiscUtil.initRowSet(p_oMaster);
-        
-        p_oMaster.insertRow();
-        p_oMaster.moveToCurrentRow();
-    }
-    
-    private String getSQ_Master(){
-        return "SELECT" +
-                    "  a.sTransNox" +
-                    ", a.sBranchCd" +
-                    ", a.dTransact" +
-                    ", a.sInvNumbr" +
-                    ", a.sClientID" +
-                    ", a.nVATSales" +
-                    ", a.nVATAmtxx" +
-                    ", a.nNonVATSl" +
-                    ", a.nZroVATSl" +
-                    ", a.nCWTAmtxx" +
-                    ", a.nAdvPaymx" +
-                    ", a.nCashAmtx" +
-                    ", a.sSourceCd" +
-                    ", a.sSourceNo" +
-                    ", a.cTranStat" +
-                    ", a.dModified" +
-                    ", IFNULL(b.sClientNm, '') sClientNm" +
-                    ", c.nTranTotl" +
-                    ", c.nDiscount" +
-                    ", c.nAddDiscx" +
-                    ", c.nFreightx" +
-                    ", c.nAmtPaidx" +
-                " FROM Sales_Invoice a" +
-                    " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID" +
-                    " LEFT JOIN Sales_Master c ON a.sSourceNo = c.sSourceNo";
+
+    @Override
+    public Object getSearchClient() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }
