@@ -12,7 +12,6 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.xersys.clients.search.ClientSearch;
 import org.xersys.commander.contants.EditMode;
-import org.xersys.commander.contants.RecordStatus;
 import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
 import org.xersys.commander.iface.XNautilus;
@@ -42,13 +41,12 @@ public class SalesInvoice implements XPayments{
     private XPaymentInfo p_oCheque;
     private XPaymentInfo p_oGC;
     
-    private ClientSearch p_oSearchClient;
+    private final ClientSearch p_oSearchClient;
     
     public SalesInvoice(XNautilus foNautilus, String fsBranchCd, boolean fbWithParent){
         p_oNautilus = foNautilus;
         p_sBranchCd = fsBranchCd;
         p_bWithParent = fbWithParent;
-        
         
         p_oSearchClient = new ClientSearch(p_oNautilus, ClientSearch.SearchType.searchClient);
         
