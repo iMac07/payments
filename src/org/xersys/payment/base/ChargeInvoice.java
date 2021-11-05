@@ -6,7 +6,11 @@ import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import org.xersys.clients.search.ClientSearch;
 import org.xersys.commander.contants.EditMode;
 import org.xersys.commander.contants.TransactionStatus;
 import org.xersys.commander.iface.LRecordMas;
@@ -32,10 +36,14 @@ public class ChargeInvoice implements XPayments{
     
     private CachedRowSet p_oMaster;
     
+    private final ClientSearch p_oSearchClient;
+    
     public ChargeInvoice(XNautilus foNautilus, String fsBranchCd, boolean fbWithParent){
         p_oNautilus = foNautilus;
         p_sBranchCd = fsBranchCd;
         p_bWithParent = fbWithParent;
+        
+        p_oSearchClient = new ClientSearch(p_oNautilus, ClientSearch.SearchType.searchClient);
         
         p_sSourceCd = "";
         p_sSourceNo = "";
@@ -237,10 +245,15 @@ public class ChargeInvoice implements XPayments{
             return;
         }
 
-        switch (fsFieldNm){
-            case "sClientID":
-                
-                break;
+        try {
+            switch (fsFieldNm){
+                case "sClientID":
+                    getClient("a.sClientID", foValue);
+                    break;
+            }
+        } catch (SQLException | ParseException e) {
+            e.printStackTrace();
+            setMessage("SQLException when assigning value to master record.");
         }
     }
 
@@ -423,11 +436,31 @@ public class ChargeInvoice implements XPayments{
 
     @Override
     public JSONObject searchClient(String fsKey, Object foValue, boolean fbExact) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        p_oSearchClient.setKey(fsKey);
+        p_oSearchClient.setValue(foValue);
+        p_oSearchClient.setExact(fbExact);
+        
+        return p_oSearchClient.Search();
     }
 
     @Override
     public Object getSearchClient() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return p_oSearchClient;
+    }
+    
+    private void getClient(String fsFieldNm, Object foValue) throws SQLException, ParseException{       
+        JSONObject loJSON = searchClient(fsFieldNm, foValue, true);
+        JSONParser loParser = new JSONParser();
+
+        if ("success".equals((String) loJSON.get("result"))){
+            loJSON = (JSONObject) ((JSONArray) loParser.parse((String) loJSON.get("payload"))).get(0);
+
+            p_oMaster.first();
+            p_oMaster.updateObject("sClientID", (String) loJSON.get("sClientID"));
+            p_oMaster.updateObject("sClientNm", (String) loJSON.get("sClientNm"));
+            p_oMaster.updateRow();            
+            
+            if (p_oListener != null) p_oListener.MasterRetreive("sClientID", (String) p_oMaster.getObject("sClientNm"));
+        }
     }
 }
