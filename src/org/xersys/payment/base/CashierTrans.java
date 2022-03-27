@@ -58,7 +58,7 @@ public class CashierTrans {
         if (lasSourceCd.length > 1){
             p_sSourceCd = "";
             
-            for (int lnCtr = 0; lnCtr <= lasSourceCd.length; lnCtr ++){
+            for (int lnCtr = 0; lnCtr <= lasSourceCd.length-1; lnCtr ++){
                 p_sSourceCd += ", " + SQLUtil.toSQL(lasSourceCd[lnCtr]);
             }
             
@@ -134,8 +134,57 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sSalesman = c.sClientID" +
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')" +
-                    " ORDER BY a.dTransact";
+                        " AND a.cTranStat IN ('0', '1')";
+        }
+        
+        if (p_sSourceCd.contains("WS")){
+            if (!lsSQL.isEmpty()) lsSQL += " UNION ";
+            
+            lsSQL = "SELECT" +
+                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        ", 'Whole Sale' sTranType" +
+                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", a.nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nAmtPaidx" +
+                        ", 'N-O-N-E' sClientNm" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                    " FROM WholeSale_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'WS'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
+                        " AND a.cTranStat IN ('0', '1')";
+        }
+        
+        if (p_sSourceCd.contains("JO")){
+            if (!lsSQL.isEmpty()) lsSQL += " UNION ";
+            
+            lsSQL += "SELECT" + 
+                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        ", 'Job Order' sTranType" +
+                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", a.nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nAmtPaidx" +
+                        ", IFNULL(c.sClientNm, '') sClientNm" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" + 
+                    " FROM Job_Order_Master a" + 
+                        " LEFT JOIN xxxTempTransactions b" + 
+                           " ON b.sSourceCd = 'JO'" + 
+                           " AND a.sTransNox = b.sTransNox" + 
+                        " LEFT JOIN Client_Master c" + 
+                           " ON a.sMechanic = c.sClientID" + 
+                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
+                        " AND a.cTranStat IN ('0', '1')";
         }
         
         return lsSQL;

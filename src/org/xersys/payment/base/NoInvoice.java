@@ -24,6 +24,7 @@ public class NoInvoice implements XPayments{
     private String p_sMessagex;
     private String p_sSourceNo;
     private String p_sSourceCd;
+    private String p_sClientID;
     
     private int p_nEditMode;
     private boolean p_bWithParent;
@@ -41,6 +42,11 @@ public class NoInvoice implements XPayments{
         
         p_sSourceCd = "";
         p_sSourceNo = "";
+    }
+    
+    @Override
+    public void setClientID(String fsValue) {
+        p_sClientID = fsValue;
     }
     
     @Override
