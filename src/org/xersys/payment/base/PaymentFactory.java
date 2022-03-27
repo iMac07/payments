@@ -13,6 +13,8 @@ public class PaymentFactory {
                 return new NoInvoice(foNautilus, fsBranchCd, fbWithParent);
             case InvoiceType.CHARGE_INVOICE:
                 return new ChargeInvoice(foNautilus, fsBranchCd, fbWithParent);
+            case InvoiceType.OFFICIAL_RECEIPT:
+                return new OfficialReceipt(foNautilus, fsBranchCd, fbWithParent);
             default:
                 return null;
         }

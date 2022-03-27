@@ -3,8 +3,6 @@ package org.xersys.payment.base;
 import com.mysql.jdbc.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
@@ -23,7 +21,8 @@ import org.xersys.commander.util.MiscUtil;
 import org.xersys.commander.util.SQLUtil;
 import org.xersys.commander.util.StringUtil;
 
-public class SalesInvoice implements XPayments{
+public class OfficialReceipt implements XPayments{
+    private final String MASTER_TABLE = "Receipt_Master";
     private final double VAT_RATE = 0.12;
     
     private final XNautilus p_oNautilus;
@@ -46,7 +45,7 @@ public class SalesInvoice implements XPayments{
     
     private final ClientSearch p_oSearchClient;
     
-    public SalesInvoice(XNautilus foNautilus, String fsBranchCd, boolean fbWithParent){
+    public OfficialReceipt(XNautilus foNautilus, String fsBranchCd, boolean fbWithParent){
         p_oNautilus = foNautilus;
         p_sBranchCd = fsBranchCd;
         p_bWithParent = fbWithParent;
@@ -55,6 +54,7 @@ public class SalesInvoice implements XPayments{
         
         p_sSourceCd = "";
         p_sSourceNo = "";
+        p_sClientID = "";
     }
     
     @Override
@@ -105,8 +105,10 @@ public class SalesInvoice implements XPayments{
                 p_oMaster.updateObject("cTranStat", TransactionStatus.STATE_OPEN);    
                 p_oMaster.updateRow();
                 
-                if (!loRS1.getString("sClientID").equals("")) 
-                    getClient("a.sClientID", loRS1.getString("sClientID"));
+                if (!p_sClientID.isEmpty()) 
+                    setMaster("sClientID", p_sClientID);
+                else if (loRS1.getString("sClientID").equals(""))
+                    setMaster("sClientID", loRS1.getString("sClientID"));
                 
                 MiscUtil.close(loRS1);
                 
@@ -119,11 +121,6 @@ public class SalesInvoice implements XPayments{
             } catch (SQLException ex) {
                 ex.printStackTrace();
                 setMessage("SQL Exception on " + lsProcName); 
-                p_nEditMode = EditMode.UNKNOWN;
-                return false;
-            } catch (ParseException ex) {
-                ex.printStackTrace();
-                setMessage("Parse Exception on " + lsProcName); 
                 p_nEditMode = EditMode.UNKNOWN;
                 return false;
             }
@@ -166,7 +163,7 @@ public class SalesInvoice implements XPayments{
             if (p_nEditMode == EditMode.ADDNEW){
                 Connection loConn = getConnection();
 
-                p_oMaster.updateObject("sTransNox", MiscUtil.getNextCode("Sales_Invoice", "sTransNox", true, loConn, p_sBranchCd));
+                p_oMaster.updateObject("sTransNox", MiscUtil.getNextCode(MASTER_TABLE, "sTransNox", true, loConn, p_sBranchCd));
                 p_oMaster.updateObject("sBranchCd", (String) p_oNautilus.getSysConfig("sBranchCd"));
                 p_oMaster.updateObject("dTransact", p_oNautilus.getServerDate());
                 p_oMaster.updateObject("sSourceCd", p_sSourceCd);
@@ -193,7 +190,7 @@ public class SalesInvoice implements XPayments{
                     return false;
                 }
                 
-                lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Sales_Invoice", "sClientNm;nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
+                lsSQL = MiscUtil.rowset2SQL(p_oMaster, MASTER_TABLE, "sClientNm;nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
             } else {
                 
             }
@@ -205,7 +202,7 @@ public class SalesInvoice implements XPayments{
                 return false;
             }
             
-            if(p_oNautilus.executeUpdate(lsSQL, "Sales_Invoice", p_sBranchCd, "") <= 0){
+            if(p_oNautilus.executeUpdate(lsSQL, MASTER_TABLE, p_sBranchCd, "") <= 0){
                 if(!p_oNautilus.getMessage().isEmpty())
                     setMessage(p_oNautilus.getMessage());
                 else
@@ -245,7 +242,7 @@ public class SalesInvoice implements XPayments{
     @Override
     public boolean CloseTransaction() {
         try {
-            String lsSQL = "UPDATE Sales_Invoice SET" +
+            String lsSQL = "UPDATE " + MASTER_TABLE + " SET" +
                                 "  cTranStat = '1'" +
                                 ", dModified = " + SQLUtil.toSQL(p_oNautilus.getServerDate()) +
                             " WHERE sTransNox = " + SQLUtil.toSQL((String) p_oMaster.getObject("sTransNox"));
@@ -461,17 +458,18 @@ public class SalesInvoice implements XPayments{
         double lnPaymTotl = computePaymentTotal();
         
         switch(p_sSourceCd){
-            case "SO":
+            case "JO":
                 lsSQL = "SELECT" +
                             " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
-                        " FROM SP_Sales_Master" +
+                            ", sSourceCd" +
+                            ", sSourceNo" +
+                        " FROM Job_Order_Master" +
                         " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
                 
                 loRS = p_oNautilus.executeQuery(lsSQL);
                 if (loRS.next()){                    
-                    lsSQL = "UPDATE SP_Sales_Master SET" +
-                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl +
-                            ", sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID"));
+                    lsSQL = "UPDATE Job_Order_Master SET" +
+                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl;
                     
                     if (loRS.getDouble("xPayablex") <= lnPaymTotl)
                         lsSQL += ", cTranStat = '2'";
@@ -480,55 +478,39 @@ public class SalesInvoice implements XPayments{
                     
                     lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
                     
-                    MiscUtil.close(loRS);
-                    
                     if (!lsSQL.isEmpty()){
-                        if(p_oNautilus.executeUpdate(lsSQL, "SP_Sales_Master", p_sBranchCd, "") <= 0){
+                        if(p_oNautilus.executeUpdate(lsSQL, "Job_Order_Master", p_sBranchCd, "") <= 0){
                             if(!p_oNautilus.getMessage().isEmpty())
                                 setMessage(p_oNautilus.getMessage());
                             else
-                                setMessage("No record updated");
+                                setMessage("Unable to update source transaction.");
 
                             return false;
                         }
-
-                        return true;
                     }
-                }
-                break;
-            case "WS":
-                lsSQL = "SELECT" +
-                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
-                        " FROM WholeSale_Master" +
-                        " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
-                
-                loRS = p_oNautilus.executeQuery(lsSQL);
-                if (loRS.next()){                    
-                    lsSQL = "UPDATE WholeSale_Master SET" +
-                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl +
-                            ", sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID"));
                     
-                    if (loRS.getDouble("xPayablex") <= lnPaymTotl)
-                        lsSQL += ", cTranStat = '2'";
-                    else 
-                        lsSQL += ", cTranStat = '1'";
-                    
-                    lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
+                    //update source of the source
+                    if (!loRS.getString("sSourceCd").isEmpty() && !loRS.getString("sSourceNo").isEmpty()){
+                        if (loRS.getString("sSourceCd").equals("JEst")){
+                            lsSQL = "UPDATE Job_Estimate_Master SET" +
+                                        " cTranStat = '4'" + 
+                                    " WHERE sTransNox = " + SQLUtil.toSQL(loRS.getString("sSourceNo"));
+
+                            if (!lsSQL.isEmpty()){
+                                if(p_oNautilus.executeUpdate(lsSQL, "Job_Estimate_Master", p_sBranchCd, "") <= 0){
+                                    if(!p_oNautilus.getMessage().isEmpty())
+                                        setMessage(p_oNautilus.getMessage());
+                                    else
+                                        setMessage("Unable to update source transaction.");
+
+                                    return false;
+                                }
+                            }
+                        }
+                    }
                     
                     MiscUtil.close(loRS);
-                    
-                    if (!lsSQL.isEmpty()){
-                        if(p_oNautilus.executeUpdate(lsSQL, "WholeSale_Master", p_sBranchCd, "") <= 0){
-                            if(!p_oNautilus.getMessage().isEmpty())
-                                setMessage(p_oNautilus.getMessage());
-                            else
-                                setMessage("No record updated");
-
-                            return false;
-                        }
-
-                        return true;
-                    }
+                    return true;
                 }
                 break;
         }
@@ -636,17 +618,16 @@ public class SalesInvoice implements XPayments{
                     ", c.nAddDiscx" +
                     ", c.nFreightx" +
                     ", c.nAmtPaidx" +
-                " FROM Sales_Invoice a" +
+                " FROM Receipt_Master a" +
                     " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID" +
-                    " LEFT JOIN SP_Sales_Master c ON a.sSourceNo = c.sSourceNo";
+                    " LEFT JOIN Job_Order_Master c ON a.sSourceNo = c.sSourceNo";
     }
     
     private String getSQ_Source(){
         String lsSQL = "";
         
-        switch (p_sSourceCd){
-            case "SO":
-                lsSQL = "SELECT" +
+        if (p_sSourceCd.contains("JO")){
+            lsSQL = "SELECT" +
                         "  IFNULL(c.sClientNm, '') sClientNm" +
                         ", a.nTranTotl" +
                         ", a.nDiscount" +
@@ -656,33 +637,13 @@ public class SalesInvoice implements XPayments{
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
-                    " FROM SP_Sales_Master a" +
+                    " FROM Job_Order_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
-                            " ON a.sClientID = c.sClientID" +
+                            " ON a.sMechanic = c.sClientID" +
                     " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
-                break;
-            case "WS":
-                lsSQL = "SELECT" +
-                        "  IFNULL(c.sClientNm, '') sClientNm" +
-                        ", a.nTranTotl" +
-                        ", a.nDiscount" +
-                        ", a.nAddDiscx" +
-                        ", a.nFreightx" +
-                        ", a.nAmtPaidx" +
-                        ", b.sSourceCd" +
-                        ", a.sTransNox" +
-                        ", a.sClientID" +
-                    " FROM WholeSale_Master a" +
-                        " LEFT JOIN xxxTempTransactions b" +
-                            " ON b.sSourceCd = 'WS'" +
-                                " AND a.sTransNox = b.sTransNox" + 
-                        " LEFT JOIN Client_Master c" + 
-                            " ON a.sClientID = c.sClientID" +
-                    " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
-                break;
         }
         
         return lsSQL;
