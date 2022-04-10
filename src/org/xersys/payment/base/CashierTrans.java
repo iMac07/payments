@@ -68,7 +68,6 @@ public class CashierTrans {
         String lsSQL = getSQ_Master();
         
         ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
-        loRS = p_oNautilus.executeQuery(lsSQL);
         
         if (MiscUtil.RecordCount(loRS) == 0){
             p_sMessagex = "No Transaction to Pay/Release at this time.";
@@ -140,7 +139,7 @@ public class CashierTrans {
         if (p_sSourceCd.contains("WS")){
             if (!lsSQL.isEmpty()) lsSQL += " UNION ";
             
-            lsSQL = "SELECT" +
+            lsSQL += "SELECT" +
                         "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
                         ", 'Whole Sale' sTranType" +
                         ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
