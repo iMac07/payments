@@ -153,8 +153,14 @@ public class OfficialReceipt implements XPayments{
             }
             
             p_oMaster.first();
+            
             if (p_oMaster.getString("sClientID").isEmpty()){
                 setMessage("Client must not be empty.");
+                return false;
+            }
+            
+            if (p_oMaster.getString("sInvNumbr").isEmpty()){
+                setMessage("OR number is not set..");
                 return false;
             }
             
@@ -458,6 +464,47 @@ public class OfficialReceipt implements XPayments{
         double lnPaymTotl = computePaymentTotal();
         
         switch(p_sSourceCd){
+            case "CO":
+                lsSQL = "SELECT" +
+                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
+                            ", sSourceCd" +
+                            ", sSourceNo" +
+                        " FROM SP_Sales_Order_Master" +
+                        " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                
+                loRS = p_oNautilus.executeQuery(lsSQL);
+                if (loRS.next()){                    
+                    lsSQL = "UPDATE SP_Sales_Order_Master SET" +
+                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl;
+                    
+                    if ((double) getMaster("nAdvPaymx") > 0.00){
+                        lsSQL += ", nForCredt = nForCredt + " + lnPaymTotl +
+                                    ", nAvailBal = nAvailBal + " + lnPaymTotl;
+                    }
+                    
+                    if (loRS.getDouble("xPayablex") <= lnPaymTotl)
+                        lsSQL += ", cTranStat = '2'";
+                    else 
+                        lsSQL += ", cTranStat = '1'";
+                    
+                    MiscUtil.close(loRS);
+                    lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
+                    
+                    if (!lsSQL.isEmpty()){
+                        if(p_oNautilus.executeUpdate(lsSQL, "SP_Sales_Order_Master", p_sBranchCd, "") <= 0){
+                            if(!p_oNautilus.getMessage().isEmpty())
+                                setMessage(p_oNautilus.getMessage());
+                            else
+                                setMessage("Unable to update source transaction.");
+
+                            return false;
+                        }
+                    }
+                    
+                    
+                    return true;
+                }
+                break;
             case "JO":
                 lsSQL = "SELECT" +
                             " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
@@ -558,6 +605,7 @@ public class OfficialReceipt implements XPayments{
     
     private double computePaymentTotal() throws SQLException{
         return (double) p_oMaster.getObject("nCashAmtx") +
+                (double) p_oMaster.getObject("nAdvPaymx") +
                             p_oCard.getPaymentTotal();
     }
     
@@ -626,8 +674,9 @@ public class OfficialReceipt implements XPayments{
     private String getSQ_Source(){
         String lsSQL = "";
         
-        if (p_sSourceCd.contains("JO")){
-            lsSQL = "SELECT" +
+        switch (p_sSourceCd){
+            case "JO": //job order
+                lsSQL = "SELECT" +
                         "  IFNULL(c.sClientNm, '') sClientNm" +
                         ", a.nTranTotl" +
                         ", a.nDiscount" +
@@ -639,10 +688,28 @@ public class OfficialReceipt implements XPayments{
                         ", a.sClientID" +
                     " FROM Job_Order_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
-                            " ON b.sSourceCd = 'SO'" +
+                            " ON b.sSourceCd = 'CO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sMechanic = c.sClientID" +
+                    " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+            case "CO": //customer order
+                lsSQL = "SELECT" +
+                        "  IFNULL(c.sClientNm, '') sClientNm" +
+                        ", a.nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nAmtPaidx" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", a.sClientID" +
+                    " FROM SP_Sales_Order_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'CO'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                        " LEFT JOIN Client_Master c" + 
+                            " ON a.sClientID = c.sClientID" +
                     " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
         }
         

@@ -136,6 +136,28 @@ public class CashierTrans {
                         " AND a.cTranStat IN ('0', '1')";
         }
         
+        if (p_sSourceCd.contains("CO")){
+            lsSQL = "SELECT" +
+                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        ", 'Customer Order' sTranType" +
+                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", a.nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nAmtPaidx" +
+                        ", '' sClientNm" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                    " FROM SP_Sales_Order_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'CO'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
+                        " AND a.cTranStat IN ('0', '1')";
+        }
+        
         if (p_sSourceCd.contains("WS")){
             if (!lsSQL.isEmpty()) lsSQL += " UNION ";
             
