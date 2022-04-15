@@ -3,8 +3,6 @@ package org.xersys.payment.base;
 import com.mysql.jdbc.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
@@ -678,6 +676,25 @@ public class SalesInvoice implements XPayments{
                     " FROM WholeSale_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'WS'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                        " LEFT JOIN Client_Master c" + 
+                            " ON a.sClientID = c.sClientID" +
+                    " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                break;
+            case "JO":
+                lsSQL = "SELECT" +
+                        "  IFNULL(c.sClientNm, '') sClientNm" +
+                        ", a.nPartTotl nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", 0.00 nFreightx" +
+                        ", a.nPartPaid nAmtPaidx" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", a.sClientID" +
+                    " FROM Job_Order_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'JO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sClientID = c.sClientID" +

@@ -678,17 +678,17 @@ public class OfficialReceipt implements XPayments{
             case "JO": //job order
                 lsSQL = "SELECT" +
                         "  IFNULL(c.sClientNm, '') sClientNm" +
-                        ", a.nTranTotl" +
+                        ", a.nLabrTotl nTranTotl" +
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
-                        ", a.nAmtPaidx" +
+                        ", a.nLabrPaid" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
                     " FROM Job_Order_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
-                            " ON b.sSourceCd = 'CO'" +
+                            " ON b.sSourceCd = 'JO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sMechanic = c.sClientID" +
