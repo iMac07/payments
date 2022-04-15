@@ -507,7 +507,7 @@ public class OfficialReceipt implements XPayments{
                 break;
             case "JO":
                 lsSQL = "SELECT" +
-                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
+                            " (nLabrTotl - ((nLabrTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nLabrPaid) xPayablex" +
                             ", sSourceCd" +
                             ", sSourceNo" +
                         " FROM Job_Order_Master" +
@@ -516,12 +516,8 @@ public class OfficialReceipt implements XPayments{
                 loRS = p_oNautilus.executeQuery(lsSQL);
                 if (loRS.next()){                    
                     lsSQL = "UPDATE Job_Order_Master SET" +
-                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl;
-                    
-                    if (loRS.getDouble("xPayablex") <= lnPaymTotl)
-                        lsSQL += ", cTranStat = '2'";
-                    else 
-                        lsSQL += ", cTranStat = '1'";
+                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl +
+                            ", nLabrPaid = nLabrPaid + " + lnPaymTotl;
                     
                     lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
                     
@@ -535,27 +531,7 @@ public class OfficialReceipt implements XPayments{
                             return false;
                         }
                     }
-                    
-                    //update source of the source
-                    if (!loRS.getString("sSourceCd").isEmpty() && !loRS.getString("sSourceNo").isEmpty()){
-                        if (loRS.getString("sSourceCd").equals("JEst")){
-                            lsSQL = "UPDATE Job_Estimate_Master SET" +
-                                        " cTranStat = '4'" + 
-                                    " WHERE sTransNox = " + SQLUtil.toSQL(loRS.getString("sSourceNo"));
-
-                            if (!lsSQL.isEmpty()){
-                                if(p_oNautilus.executeUpdate(lsSQL, "Job_Estimate_Master", p_sBranchCd, "") <= 0){
-                                    if(!p_oNautilus.getMessage().isEmpty())
-                                        setMessage(p_oNautilus.getMessage());
-                                    else
-                                        setMessage("Unable to update source transaction.");
-
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                    
+                                       
                     MiscUtil.close(loRS);
                     return true;
                 }
@@ -682,7 +658,7 @@ public class OfficialReceipt implements XPayments{
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
-                        ", a.nLabrPaid" +
+                        ", a.nLabrPaid nAmtPaidx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
@@ -693,6 +669,7 @@ public class OfficialReceipt implements XPayments{
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sMechanic = c.sClientID" +
                     " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                break;
             case "CO": //customer order
                 lsSQL = "SELECT" +
                         "  IFNULL(c.sClientNm, '') sClientNm" +
@@ -716,3 +693,23 @@ public class OfficialReceipt implements XPayments{
         return lsSQL;
     }
 }
+
+//                    //update source of the source
+//                    if (!loRS.getString("sSourceCd").isEmpty() && !loRS.getString("sSourceNo").isEmpty()){
+//                        if (loRS.getString("sSourceCd").equals("JEst")){
+//                            lsSQL = "UPDATE Job_Estimate_Master SET" +
+//                                        " cTranStat = '4'" + 
+//                                    " WHERE sTransNox = " + SQLUtil.toSQL(loRS.getString("sSourceNo"));
+//
+//                            if (!lsSQL.isEmpty()){
+//                                if(p_oNautilus.executeUpdate(lsSQL, "Job_Estimate_Master", p_sBranchCd, "") <= 0){
+//                                    if(!p_oNautilus.getMessage().isEmpty())
+//                                        setMessage(p_oNautilus.getMessage());
+//                                    else
+//                                        setMessage("Unable to update source transaction.");
+//
+//                                    return false;
+//                                }
+//                            }
+//                        }
+//                    }

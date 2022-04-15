@@ -529,6 +529,37 @@ public class SalesInvoice implements XPayments{
                     }
                 }
                 break;
+            case "JO":
+                lsSQL = "SELECT" +
+                            " (nPartTotl - ((nPartTotl * nDiscount / 100) + nAddDiscx) - nPartPaid) xPayablex" +
+                            ", sSourceCd" +
+                            ", sSourceNo" +
+                        " FROM Job_Order_Master" +
+                        " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                
+                loRS = p_oNautilus.executeQuery(lsSQL);
+                if (loRS.next()){                    
+                    lsSQL = "UPDATE Job_Order_Master SET" +
+                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl +
+                            ", nPartPaid = nPartPaid + " + lnPaymTotl;
+                    
+                    lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
+                    
+                    if (!lsSQL.isEmpty()){
+                        if(p_oNautilus.executeUpdate(lsSQL, "Job_Order_Master", p_sBranchCd, "") <= 0){
+                            if(!p_oNautilus.getMessage().isEmpty())
+                                setMessage(p_oNautilus.getMessage());
+                            else
+                                setMessage("Unable to update source transaction.");
+
+                            return false;
+                        }
+                    }
+                                       
+                    MiscUtil.close(loRS);
+                    return true;
+                }
+                break;    
         }
         
         setMessage("Unable to update source transaction.");

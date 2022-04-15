@@ -133,11 +133,14 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sSalesman = c.sClientID" +
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex > 0.00";
         }
         
         if (p_sSourceCd.contains("CO")){
-            lsSQL = "SELECT" +
+            if (!lsSQL.isEmpty()) lsSQL += " UNION ";
+            
+            lsSQL += "SELECT" +
                         "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
                         ", 'Customer Order' sTranType" +
                         ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
@@ -155,7 +158,8 @@ public class CashierTrans {
                             " ON b.sSourceCd = 'CO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex > 0.00";
         }
         
         if (p_sSourceCd.contains("WS")){
@@ -179,7 +183,8 @@ public class CashierTrans {
                             " ON b.sSourceCd = 'WS'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex > 0.00";
         }
         
         if (p_sSourceCd.contains("JO")){
@@ -205,7 +210,8 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                            " ON a.sMechanic = c.sClientID" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex > 0.00";
         }
         
         return lsSQL;
