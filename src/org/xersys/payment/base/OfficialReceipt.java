@@ -170,7 +170,7 @@ public class OfficialReceipt implements XPayments{
                 Connection loConn = getConnection();
 
                 p_oMaster.updateObject("sTransNox", MiscUtil.getNextCode(MASTER_TABLE, "sTransNox", true, loConn, p_sBranchCd));
-                p_oMaster.updateObject("sBranchCd", (String) p_oNautilus.getSysConfig("sBranchCd"));
+                p_oMaster.updateObject("sBranchCd", (String) p_oNautilus.getBranchConfig("sBranchCd"));
                 p_oMaster.updateObject("dTransact", p_oNautilus.getServerDate());
                 p_oMaster.updateObject("sSourceCd", p_sSourceCd);
                 p_oMaster.updateObject("sSourceNo", p_sSourceNo);
@@ -477,7 +477,7 @@ public class OfficialReceipt implements XPayments{
                     lsSQL = "UPDATE SP_Sales_Order_Master SET" +
                             "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl;
                     
-                    if ((double) getMaster("nAdvPaymx") > 0.00){
+                    if (lnPaymTotl > 0.00){
                         lsSQL += ", nForCredt = nForCredt + " + lnPaymTotl +
                                     ", nAvailBal = nAvailBal + " + lnPaymTotl;
                     }

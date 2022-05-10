@@ -125,7 +125,9 @@ public class CashierTrans {
                         ", IFNULL(c.sClientNm, '') sClientNm" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
-                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx + a.nOthChrge - a.nDeductnx - a.nAmtPaidx) xPayablex" +
+                        ", a.nOthChrge" +
+                        ", a.nDeductnx" +
                     " FROM SP_Sales_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
@@ -153,13 +155,17 @@ public class CashierTrans {
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                        ", 0.00 nOthChrge" +
+                        ", 0.00 nDeductnx" +
                     " FROM SP_Sales_Order_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'CO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')" +
+                        " AND a.cTranStat = '0'" +
                     " HAVING xPayablex > 0.00";
+            
+            //" AND a.cTranStat IN ('0', '1')"
         }
         
         if (p_sSourceCd.contains("WS")){
@@ -178,6 +184,8 @@ public class CashierTrans {
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                        ", 0.00 nOthChrge" +
+                        ", 0.00 nDeductnx" +
                     " FROM WholeSale_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'WS'" +
@@ -203,6 +211,8 @@ public class CashierTrans {
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" + 
+                        ", 0.00 nOthChrge" +
+                        ", 0.00 nDeductnx" +
                     " FROM Job_Order_Master a" + 
                         " LEFT JOIN xxxTempTransactions b" + 
                            " ON b.sSourceCd = 'JO'" + 
