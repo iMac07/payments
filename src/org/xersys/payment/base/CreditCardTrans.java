@@ -225,7 +225,33 @@ public class CreditCardTrans implements XPaymentInfo{
     
     @Override
     public boolean OpenTransaction() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        String lsProcName = this.getClass().getSimpleName() + ".NewTransaction()";
+        
+        if (p_oNautilus == null){
+            p_sMessagex = "Application driver is not set.";
+            return false;
+        }
+        
+        try {
+            RowSetFactory factory = RowSetProvider.newFactory();
+
+            //create empty master record
+            String lsSQL = MiscUtil.addCondition(getSQ_Detail(), "0=1");
+            ResultSet loRS  = p_oNautilus.executeQuery(lsSQL);
+            p_oDetail = factory.createCachedRowSet();
+            p_oDetail.populate(loRS);
+            MiscUtil.close(loRS);
+            addDetail();     
+
+            p_nEditMode = EditMode.ADDNEW;
+
+            return true;
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            setMessage("SQLException on " + lsProcName + ". Please inform your System Admin.");
+            p_nEditMode = EditMode.UNKNOWN;
+            return false;
+        }  
     }
 
     @Override

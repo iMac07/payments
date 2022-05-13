@@ -154,7 +154,8 @@ public class SalesInvoice implements XPayments{
             }
             
             p_oMaster.first();
-            if (p_oMaster.getString("sClientID").isEmpty()){
+            if (p_oMaster.getString("sClientID").isEmpty() &&
+                p_oMaster.getString("sClientNm").isEmpty()){
                 setMessage("Client must not be empty.");
                 return false;
             }
@@ -191,9 +192,8 @@ public class SalesInvoice implements XPayments{
                     return false;
                 }
                 
-                lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Sales_Invoice", "sClientNm;nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
+                lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Sales_Invoice", "nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
             } else {
-                
             }
             
             if (lsSQL.equals("")){
@@ -235,8 +235,45 @@ public class SalesInvoice implements XPayments{
 
     @Override
     public boolean OpenTransaction(String fsTransNox) {
-        System.out.println(this.getClass().getSimpleName() + ".OpenRecord()");
+        String lsProcName = this.getClass().getSimpleName() + ".OpenTransaction(String fsTransNox)";
+        System.out.println(lsProcName);
         
+        if (p_oNautilus == null){
+            p_sMessagex = "Application driver is not set.";
+            return false;
+        }
+        
+        try {
+            RowSetFactory factory = RowSetProvider.newFactory();
+
+            //create empty master record
+            String lsSQL = MiscUtil.addCondition(getSQ_Master(), "a.sTransNox = " + SQLUtil.toSQL(fsTransNox));
+            ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
+            
+            if (MiscUtil.RecordCount(loRS) == 0){
+                setMessage("No record found."); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+            
+            p_oMaster = factory.createCachedRowSet();
+            p_oMaster.populate(loRS);
+            MiscUtil.close(loRS);
+            
+            p_oCard = new CreditCardTrans(p_oNautilus, p_sBranchCd, true);
+            if (!p_oCard.NewTransaction()){
+                setMessage(p_oCard.getMessage()); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            setMessage("SQL Exception on " + lsProcName); 
+            p_nEditMode = EditMode.UNKNOWN;
+            return false;
+        }
+
+        p_nEditMode = EditMode.READY;
         return true;
     }
     
@@ -327,6 +364,13 @@ public class SalesInvoice implements XPayments{
                     break;
                 case "sClientID":
                     getClient("a.sClientID", foValue);
+                    break;
+                case "sClientNm":
+                    p_oMaster.first();
+                    p_oMaster.updateObject(fsFieldNm, (String) foValue);
+                    p_oMaster.updateRow();
+                    
+                    if (p_oListener != null) p_oListener.MasterRetreive("sClientID", (String) p_oMaster.getObject("sClientNm"));
                     break;
                 case "nVATSales":
                 case "nVATAmtxx":
@@ -659,7 +703,7 @@ public class SalesInvoice implements XPayments{
                     ", a.sSourceNo" +
                     ", a.cTranStat" +
                     ", a.dModified" +
-                    ", IFNULL(b.sClientNm, '') sClientNm" +
+                    ", IFNULL(b.sClientNm, a.sClientNm) sClientNm" +
                     ", c.nTranTotl" +
                     ", c.nDiscount" +
                     ", c.nAddDiscx" +

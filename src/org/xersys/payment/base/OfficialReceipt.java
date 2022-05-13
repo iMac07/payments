@@ -154,7 +154,8 @@ public class OfficialReceipt implements XPayments{
             
             p_oMaster.first();
             
-            if (p_oMaster.getString("sClientID").isEmpty()){
+            if (p_oMaster.getString("sClientID").isEmpty() &&
+                p_oMaster.getString("sClientNm").isEmpty()){
                 setMessage("Client must not be empty.");
                 return false;
             }
@@ -196,7 +197,7 @@ public class OfficialReceipt implements XPayments{
                     return false;
                 }
                 
-                lsSQL = MiscUtil.rowset2SQL(p_oMaster, MASTER_TABLE, "sClientNm;nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
+                lsSQL = MiscUtil.rowset2SQL(p_oMaster, MASTER_TABLE, "nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
             } else {
                 
             }
@@ -332,6 +333,13 @@ public class OfficialReceipt implements XPayments{
                     break;
                 case "sClientID":
                     getClient("a.sClientID", foValue);
+                    break;
+                case "sClientNm":
+                    p_oMaster.first();
+                    p_oMaster.updateObject(fsFieldNm, (String) foValue);
+                    p_oMaster.updateRow();
+                    
+                    if (p_oListener != null) p_oListener.MasterRetreive("sClientID", (String) p_oMaster.getObject("sClientNm"));
                     break;
                 case "nVATSales":
                 case "nVATAmtxx":
@@ -636,7 +644,7 @@ public class OfficialReceipt implements XPayments{
                     ", a.sSourceNo" +
                     ", a.cTranStat" +
                     ", a.dModified" +
-                    ", IFNULL(b.sClientNm, '') sClientNm" +
+                    ", IFNULL(b.sClientNm, '', a.sClientNm) sClientNm" +
                     ", c.nTranTotl" +
                     ", c.nDiscount" +
                     ", c.nAddDiscx" +
