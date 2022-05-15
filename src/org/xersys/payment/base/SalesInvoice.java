@@ -1,6 +1,7 @@
 package org.xersys.payment.base;
 
 import com.mysql.jdbc.Connection;
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
@@ -266,6 +267,9 @@ public class SalesInvoice implements XPayments{
                 p_nEditMode = EditMode.UNKNOWN;
                 return false;
             }
+            
+            computePaymentTotal();
+            computeTax();
         } catch (SQLException ex) {
             ex.printStackTrace();
             setMessage("SQL Exception on " + lsProcName); 
@@ -638,25 +642,23 @@ public class SalesInvoice implements XPayments{
     }
      
     private Number computeTotal() throws SQLException{
-        double lnTranTotl = (double) p_oMaster.getObject("nTranTotl");
-        double lnDiscount = (double) p_oMaster.getObject("nDiscount");
-        double lnAddDiscx = (double) p_oMaster.getObject("nAddDiscx");
-        double lnFreightx = (double) p_oMaster.getObject("nFreightx");
-        double lnAmtPaidx = (double) p_oMaster.getObject("nAmtPaidx");
+        double lnTranTotl = (double) getMaster("nTranTotl");
+        double lnDiscount = (double) getMaster("nDiscount");
+        double lnAddDiscx = (double) getMaster("nAddDiscx");
+        double lnFreightx = (double) getMaster("nFreightx");
+        double lnAmtPaidx = (double) getMaster("nAmtPaidx");
 
         return Math.round((lnTranTotl + lnFreightx - lnAmtPaidx - ((lnTranTotl * lnDiscount / 100) + lnAddDiscx)) * 100.0) / 100.0;
     }
     
     private double computePaymentTotal() throws SQLException{
-        return (double) p_oMaster.getObject("nCashAmtx") +
-                            p_oCard.getPaymentTotal();
+        return ((BigDecimal) getMaster("nCashAmtx")).doubleValue() +
+                p_oCard.getPaymentTotal();
     }
     
-    private void computeTax() throws SQLException{
-        p_oMaster.first();
-        
-        double lnCashAmtx = (double) p_oMaster.getObject("nCashAmtx");
-        double lnAdvPaymx = (double) p_oMaster.getObject("nAdvPaymx");
+    private void computeTax() throws SQLException{        
+        double lnCashAmtx = ((BigDecimal) getMaster("nCashAmtx")).doubleValue();
+        double lnAdvPaymx = ((BigDecimal) getMaster("nAdvPaymx")).doubleValue();
         double lnCardPaym = p_oCard.getPaymentTotal();
         
         //todo:
@@ -672,6 +674,7 @@ public class SalesInvoice implements XPayments{
         double lnVATSales = lnTranTotl / (1 + VAT_RATE);
         double lnVATAmtxx = lnVATSales * VAT_RATE;
         
+        p_oMaster.first();
         p_oMaster.updateObject("nVATSales", Math.round(lnVATSales * 100.0) / 100.0);
         p_oMaster.updateObject("nVATAmtxx", Math.round(lnVATAmtxx * 100.0) / 100.0);
         p_oMaster.updateObject("nNonVATSl", Math.round(lnNonVATSl * 100.0) / 100.0);
@@ -679,10 +682,10 @@ public class SalesInvoice implements XPayments{
         p_oMaster.updateObject("nCWTAmtxx", Math.round(lnCWTAmtxx * 100.0) / 100.0);
         p_oMaster.updateRow();
         
-        p_oListener.MasterRetreive("nVATSales", p_oMaster.getObject("nVATSales"));
-        p_oListener.MasterRetreive("nVATAmtxx", p_oMaster.getObject("nVATAmtxx"));
-        p_oListener.MasterRetreive("nNonVATSl", p_oMaster.getObject("nNonVATSl"));
-        p_oListener.MasterRetreive("nZroVATSl", p_oMaster.getObject("nZroVATSl"));
+        p_oListener.MasterRetreive("nVATSales", getMaster("nVATSales"));
+        p_oListener.MasterRetreive("nVATAmtxx", getMaster("nVATAmtxx"));
+        p_oListener.MasterRetreive("nNonVATSl", getMaster("nNonVATSl"));
+        p_oListener.MasterRetreive("nZroVATSl", getMaster("nZroVATSl"));
     }
     
     private String getSQ_Master(){
