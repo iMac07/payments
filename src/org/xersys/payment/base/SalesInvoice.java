@@ -1,7 +1,6 @@
 package org.xersys.payment.base;
 
 import com.mysql.jdbc.Connection;
-import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.rowset.CachedRowSet;
@@ -642,23 +641,24 @@ public class SalesInvoice implements XPayments{
     }
      
     private Number computeTotal() throws SQLException{
-        double lnTranTotl = (double) getMaster("nTranTotl");
-        double lnDiscount = (double) getMaster("nDiscount");
-        double lnAddDiscx = (double) getMaster("nAddDiscx");
-        double lnFreightx = (double) getMaster("nFreightx");
-        double lnAmtPaidx = (double) getMaster("nAmtPaidx");
+        p_oMaster.first();
+        double lnTranTotl = p_oMaster.getDouble("nTranTotl");
+        double lnDiscount = p_oMaster.getDouble("nDiscount");
+        double lnAddDiscx = p_oMaster.getDouble("nAddDiscx");
+        double lnFreightx = p_oMaster.getDouble("nFreightx");
+        double lnAmtPaidx = p_oMaster.getDouble("nAmtPaidx");
 
         return Math.round((lnTranTotl + lnFreightx - lnAmtPaidx - ((lnTranTotl * lnDiscount / 100) + lnAddDiscx)) * 100.0) / 100.0;
     }
     
     private double computePaymentTotal() throws SQLException{
-        return ((BigDecimal) getMaster("nCashAmtx")).doubleValue() +
+        return Double.valueOf(String.valueOf(getMaster("nCashAmtx"))) +
                 p_oCard.getPaymentTotal();
     }
     
     private void computeTax() throws SQLException{        
-        double lnCashAmtx = ((BigDecimal) getMaster("nCashAmtx")).doubleValue();
-        double lnAdvPaymx = ((BigDecimal) getMaster("nAdvPaymx")).doubleValue();
+        double lnCashAmtx = Double.valueOf(String.valueOf(getMaster("nCashAmtx")));
+        double lnAdvPaymx = Double.valueOf(String.valueOf(getMaster("nAdvPaymx")));
         double lnCardPaym = p_oCard.getPaymentTotal();
         
         //todo:
@@ -682,10 +682,10 @@ public class SalesInvoice implements XPayments{
         p_oMaster.updateObject("nCWTAmtxx", Math.round(lnCWTAmtxx * 100.0) / 100.0);
         p_oMaster.updateRow();
         
-        p_oListener.MasterRetreive("nVATSales", getMaster("nVATSales"));
-        p_oListener.MasterRetreive("nVATAmtxx", getMaster("nVATAmtxx"));
-        p_oListener.MasterRetreive("nNonVATSl", getMaster("nNonVATSl"));
-        p_oListener.MasterRetreive("nZroVATSl", getMaster("nZroVATSl"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nVATSales", getMaster("nVATSales"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nVATAmtxx", getMaster("nVATAmtxx"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nNonVATSl", getMaster("nNonVATSl"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nZroVATSl", getMaster("nZroVATSl"));
     }
     
     private String getSQ_Master(){

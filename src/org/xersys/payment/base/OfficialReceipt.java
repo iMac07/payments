@@ -241,8 +241,48 @@ public class OfficialReceipt implements XPayments{
 
     @Override
     public boolean OpenTransaction(String fsTransNox) {
-        System.out.println(this.getClass().getSimpleName() + ".OpenRecord()");
+        String lsProcName = this.getClass().getSimpleName() + ".OpenTransaction(String fsTransNox)";
+        System.out.println(lsProcName);
         
+        if (p_oNautilus == null){
+            p_sMessagex = "Application driver is not set.";
+            return false;
+        }
+        
+        try {
+            RowSetFactory factory = RowSetProvider.newFactory();
+
+            //create empty master record
+            String lsSQL = MiscUtil.addCondition(getSQ_Master(), "a.sTransNox = " + SQLUtil.toSQL(fsTransNox));
+            ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
+            
+            if (MiscUtil.RecordCount(loRS) == 0){
+                setMessage("No record found."); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+            
+            p_oMaster = factory.createCachedRowSet();
+            p_oMaster.populate(loRS);
+            MiscUtil.close(loRS);
+            
+            p_oCard = new CreditCardTrans(p_oNautilus, p_sBranchCd, true);
+            if (!p_oCard.NewTransaction()){
+                setMessage(p_oCard.getMessage()); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+            
+            computePaymentTotal();
+            computeTax();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            setMessage("SQL Exception on " + lsProcName); 
+            p_nEditMode = EditMode.UNKNOWN;
+            return false;
+        }
+
+        p_nEditMode = EditMode.READY;
         return true;
     }
     
@@ -578,6 +618,7 @@ public class OfficialReceipt implements XPayments{
     }
      
     private Number computeTotal() throws SQLException{
+        p_oMaster.first();
         double lnTranTotl = (double) p_oMaster.getObject("nTranTotl");
         double lnDiscount = (double) p_oMaster.getObject("nDiscount");
         double lnAddDiscx = (double) p_oMaster.getObject("nAddDiscx");
@@ -588,16 +629,16 @@ public class OfficialReceipt implements XPayments{
     }
     
     private double computePaymentTotal() throws SQLException{
-        return (double) p_oMaster.getObject("nCashAmtx") +
-                (double) p_oMaster.getObject("nAdvPaymx") +
-                            p_oCard.getPaymentTotal();
+        return Double.valueOf(String.valueOf(getMaster("nCashAmtx"))) +
+                Double.valueOf(String.valueOf(getMaster("nAdvPaymx"))) +
+                p_oCard.getPaymentTotal();
     }
     
     private void computeTax() throws SQLException{
         p_oMaster.first();
         
-        double lnCashAmtx = (double) p_oMaster.getObject("nCashAmtx");
-        double lnAdvPaymx = (double) p_oMaster.getObject("nAdvPaymx");
+        double lnCashAmtx = Double.valueOf(String.valueOf(getMaster("nCashAmtx")));
+        double lnAdvPaymx = Double.valueOf(String.valueOf(getMaster("nAdvPaymx")));
         double lnCardPaym = p_oCard.getPaymentTotal();
         
         //todo:
@@ -620,10 +661,10 @@ public class OfficialReceipt implements XPayments{
         p_oMaster.updateObject("nCWTAmtxx", Math.round(lnCWTAmtxx * 100.0) / 100.0);
         p_oMaster.updateRow();
         
-        p_oListener.MasterRetreive("nVATSales", p_oMaster.getObject("nVATSales"));
-        p_oListener.MasterRetreive("nVATAmtxx", p_oMaster.getObject("nVATAmtxx"));
-        p_oListener.MasterRetreive("nNonVATSl", p_oMaster.getObject("nNonVATSl"));
-        p_oListener.MasterRetreive("nZroVATSl", p_oMaster.getObject("nZroVATSl"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nVATSales", getMaster("nVATSales"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nVATAmtxx", getMaster("nVATAmtxx"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nNonVATSl", getMaster("nNonVATSl"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nZroVATSl", getMaster("nZroVATSl"));
     }
     
     private String getSQ_Master(){
@@ -644,7 +685,7 @@ public class OfficialReceipt implements XPayments{
                     ", a.sSourceNo" +
                     ", a.cTranStat" +
                     ", a.dModified" +
-                    ", IFNULL(b.sClientNm, '', a.sClientNm) sClientNm" +
+                    ", IFNULL(b.sClientNm, a.sClientNm) sClientNm" +
                     ", c.nTranTotl" +
                     ", c.nDiscount" +
                     ", c.nAddDiscx" +
