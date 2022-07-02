@@ -716,7 +716,7 @@ public class OfficialReceipt implements XPayments{
                             " ON b.sSourceCd = 'JO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
-                            " ON a.sMechanic = c.sClientID" +
+                            " ON a.sClientID = c.sClientID" +
                     " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
                 break;
             case "CO": //customer order
