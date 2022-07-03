@@ -555,7 +555,10 @@ public class OfficialReceipt implements XPayments{
                 break;
             case "JO":
                 lsSQL = "SELECT" +
-                            " (nLabrTotl - ((nLabrTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nLabrPaid) xPayablex" +
+                            " (nLabrTotl - ((nLabrTotl * nDiscount / 100) + nAddDiscx) - nLabrPaid) xPayablex" +
+                            ", nFreightx" +
+                            ", nAmtPaidx" +
+                            ", nTranTotl" +
                             ", sSourceCd" +
                             ", sSourceNo" +
                         " FROM Job_Order_Master" +
@@ -566,6 +569,9 @@ public class OfficialReceipt implements XPayments{
                     lsSQL = "UPDATE Job_Order_Master SET" +
                             "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl +
                             ", nLabrPaid = nLabrPaid + " + lnPaymTotl;
+                    
+                    if (loRS.getDouble("nAmtPaidx") + lnPaymTotl >= loRS.getDouble("nTranTotl") + loRS.getDouble("nFreightx"))
+                        lsSQL += ", cTranStat = '2'";
                     
                     lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
                     
@@ -686,14 +692,13 @@ public class OfficialReceipt implements XPayments{
                     ", a.cTranStat" +
                     ", a.dModified" +
                     ", IFNULL(b.sClientNm, a.sClientNm) sClientNm" +
-                    ", c.nTranTotl" +
-                    ", c.nDiscount" +
-                    ", c.nAddDiscx" +
-                    ", c.nFreightx" +
-                    ", c.nAmtPaidx" +
+                    ", 0.00 nTranTotl" +
+                    ", 0.00 nDiscount" +
+                    ", 0.00 nAddDiscx" +
+                    ", 0.00 nFreightx" +
+                    ", 0.00 nAmtPaidx" +
                 " FROM Receipt_Master a" +
-                    " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID" +
-                    " LEFT JOIN Job_Order_Master c ON a.sSourceNo = c.sSourceNo";
+                    " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID";
     }
     
     private String getSQ_Source(){
@@ -706,7 +711,7 @@ public class OfficialReceipt implements XPayments{
                         ", a.nLabrTotl nTranTotl" +
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
-                        ", a.nFreightx" +
+                        ", 0.00 nFreightx" +
                         ", a.nLabrPaid nAmtPaidx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
@@ -743,22 +748,29 @@ public class OfficialReceipt implements XPayments{
     }
 }
 
-//                    //update source of the source
-//                    if (!loRS.getString("sSourceCd").isEmpty() && !loRS.getString("sSourceNo").isEmpty()){
-//                        if (loRS.getString("sSourceCd").equals("JEst")){
-//                            lsSQL = "UPDATE Job_Estimate_Master SET" +
-//                                        " cTranStat = '4'" + 
-//                                    " WHERE sTransNox = " + SQLUtil.toSQL(loRS.getString("sSourceNo"));
-//
-//                            if (!lsSQL.isEmpty()){
-//                                if(p_oNautilus.executeUpdate(lsSQL, "Job_Estimate_Master", p_sBranchCd, "") <= 0){
-//                                    if(!p_oNautilus.getMessage().isEmpty())
-//                                        setMessage(p_oNautilus.getMessage());
-//                                    else
-//                                        setMessage("Unable to update source transaction.");
-//
-//                                    return false;
-//                                }
-//                            }
-//                        }
-//                    }
+//return "SELECT" +
+//                    "  a.sTransNox" +
+//                    ", a.sBranchCd" +
+//                    ", a.dTransact" +
+//                    ", a.sInvNumbr" +
+//                    ", a.sClientID" +
+//                    ", a.nVATSales" +
+//                    ", a.nVATAmtxx" +
+//                    ", a.nNonVATSl" +
+//                    ", a.nZroVATSl" +
+//                    ", a.nCWTAmtxx" +
+//                    ", a.nAdvPaymx" +
+//                    ", a.nCashAmtx" +
+//                    ", a.sSourceCd" +
+//                    ", a.sSourceNo" +
+//                    ", a.cTranStat" +
+//                    ", a.dModified" +
+//                    ", IFNULL(b.sClientNm, a.sClientNm) sClientNm" +
+//                    ", c.nTranTotl" +
+//                    ", c.nDiscount" +
+//                    ", c.nAddDiscx" +
+//                    ", c.nFreightx" +
+//                    ", c.nAmtPaidx" +
+//                " FROM Receipt_Master a" +
+//                    " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID" +
+//                    " LEFT JOIN Job_Order_Master c ON a.sSourceNo = c.sSourceNo";

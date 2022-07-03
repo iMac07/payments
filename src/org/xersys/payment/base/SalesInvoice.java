@@ -99,7 +99,8 @@ public class SalesInvoice implements XPayments{
                 p_oMaster.updateObject("nDiscount", loRS1.getDouble("nDiscount"));
                 p_oMaster.updateObject("nAddDiscx", loRS1.getDouble("nAddDiscx"));
                 p_oMaster.updateObject("nFreightx", loRS1.getDouble("nFreightx"));
-                p_oMaster.updateObject("nAmtPaidx", loRS1.getDouble("nAmtPaidx"));                
+                p_oMaster.updateObject("nAmtPaidx", loRS1.getDouble("nAmtPaidx"));    
+                p_oMaster.updateObject("nAdvPaymx", loRS1.getDouble("nDeductnx"));    
                 p_oMaster.updateObject("cTranStat", TransactionStatus.STATE_OPEN);    
                 p_oMaster.updateRow();
                 
@@ -157,6 +158,11 @@ public class SalesInvoice implements XPayments{
             if (p_oMaster.getString("sClientID").isEmpty() &&
                 p_oMaster.getString("sClientNm").isEmpty()){
                 setMessage("Client must not be empty.");
+                return false;
+            }
+            
+            if (p_oMaster.getString("sInvNumbr").isEmpty()){
+                setMessage("OR number is not set..");
                 return false;
             }
             
@@ -508,7 +514,7 @@ public class SalesInvoice implements XPayments{
         switch(p_sSourceCd){
             case "SO":
                 lsSQL = "SELECT" +
-                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
+                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx - nDeductnx) xPayablex" +
                         " FROM SP_Sales_Master" +
                         " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
                 
@@ -578,7 +584,7 @@ public class SalesInvoice implements XPayments{
                 break;
             case "JO":
                 lsSQL = "SELECT" +
-                            " (nPartTotl - ((nPartTotl * nDiscount / 100) + nAddDiscx) - nPartPaid) xPayablex" +
+                            " (nPartTotl - ((nPartTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nPartPaid) xPayablex" +
                             ", sSourceCd" +
                             ", sSourceNo" +
                         " FROM Job_Order_Master" +
@@ -658,14 +664,13 @@ public class SalesInvoice implements XPayments{
     
     private void computeTax() throws SQLException{        
         double lnCashAmtx = Double.valueOf(String.valueOf(getMaster("nCashAmtx")));
-        double lnAdvPaymx = Double.valueOf(String.valueOf(getMaster("nAdvPaymx")));
         double lnCardPaym = p_oCard.getPaymentTotal();
         
         //todo:
         //  get card total; get check total; get gc total
         //  then add to the transaction total
         
-        double lnTranTotl = lnCashAmtx + lnAdvPaymx + lnCardPaym;
+        double lnTranTotl = lnCashAmtx + lnCardPaym;
         
         double lnNonVATSl = 0.00;
         double lnZroVATSl = 0.00;
@@ -729,6 +734,7 @@ public class SalesInvoice implements XPayments{
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
+                        ", a.nDeductnx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
@@ -748,6 +754,7 @@ public class SalesInvoice implements XPayments{
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
+                        ", 0.00 nDeductnx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
@@ -765,8 +772,9 @@ public class SalesInvoice implements XPayments{
                         ", a.nPartTotl nTranTotl" +
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
-                        ", 0.00 nFreightx" +
+                        ", a.nFreightx" +
                         ", a.nPartPaid nAmtPaidx" +
+                        ", 0.00 nDeductnx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
