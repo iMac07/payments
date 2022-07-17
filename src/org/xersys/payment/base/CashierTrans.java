@@ -164,8 +164,6 @@ public class CashierTrans {
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
                         " AND a.cTranStat = '0'" +
                     " HAVING xPayablex > 0.00";
-            
-            //" AND a.cTranStat IN ('0', '1')"
         }
         
         if (p_sSourceCd.contains("WS")){
@@ -203,14 +201,14 @@ public class CashierTrans {
                         ", 'Job Order' sTranType" +
                         ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
                         ", a.nTranTotl" +
-                        ", a.nDiscount" +
-                        ", a.nAddDiscx" +
+                        ", 0.00 nDiscount" +
+                        ", 0.00 nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
                         ", IFNULL(c.sClientNm, '') sClientNm" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
-                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" + 
+                        ", a.nTranTotl + a.nFreightx - a.nAmtPaidx xPayablex" + 
                         ", 0.00 nOthChrge" +
                         ", 0.00 nDeductnx" +
                     " FROM Job_Order_Master a" + 

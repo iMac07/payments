@@ -555,7 +555,7 @@ public class OfficialReceipt implements XPayments{
                 break;
             case "JO":
                 lsSQL = "SELECT" +
-                            " (nLabrTotl - ((nLabrTotl * nDiscount / 100) + nAddDiscx) - nLabrPaid) xPayablex" +
+                            " (nLabrTotl - (nLabrTotl * nLabrDisc / 100) - nLabrPaid) xPayablex" +
                             ", nFreightx" +
                             ", nAmtPaidx" +
                             ", nTranTotl" +
@@ -709,8 +709,8 @@ public class OfficialReceipt implements XPayments{
                 lsSQL = "SELECT" +
                         "  IFNULL(c.sClientNm, '') sClientNm" +
                         ", a.nLabrTotl nTranTotl" +
-                        ", a.nDiscount" +
-                        ", a.nAddDiscx" +
+                        ", a.nLabrDisc nDiscount" +
+                        ", 0.00 nAddDiscx" +
                         ", 0.00 nFreightx" +
                         ", a.nLabrPaid nAmtPaidx" +
                         ", b.sSourceCd" +
@@ -747,30 +747,3 @@ public class OfficialReceipt implements XPayments{
         return lsSQL;
     }
 }
-
-//return "SELECT" +
-//                    "  a.sTransNox" +
-//                    ", a.sBranchCd" +
-//                    ", a.dTransact" +
-//                    ", a.sInvNumbr" +
-//                    ", a.sClientID" +
-//                    ", a.nVATSales" +
-//                    ", a.nVATAmtxx" +
-//                    ", a.nNonVATSl" +
-//                    ", a.nZroVATSl" +
-//                    ", a.nCWTAmtxx" +
-//                    ", a.nAdvPaymx" +
-//                    ", a.nCashAmtx" +
-//                    ", a.sSourceCd" +
-//                    ", a.sSourceNo" +
-//                    ", a.cTranStat" +
-//                    ", a.dModified" +
-//                    ", IFNULL(b.sClientNm, a.sClientNm) sClientNm" +
-//                    ", c.nTranTotl" +
-//                    ", c.nDiscount" +
-//                    ", c.nAddDiscx" +
-//                    ", c.nFreightx" +
-//                    ", c.nAmtPaidx" +
-//                " FROM Receipt_Master a" +
-//                    " LEFT JOIN Client_Master b ON a.sClientID = b.sClientID" +
-//                    " LEFT JOIN Job_Order_Master c ON a.sSourceNo = c.sSourceNo";

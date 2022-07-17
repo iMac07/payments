@@ -584,7 +584,7 @@ public class SalesInvoice implements XPayments{
                 break;
             case "JO":
                 lsSQL = "SELECT" +
-                            " (nPartTotl - ((nPartTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nPartPaid) xPayablex" +
+                            " (nPartTotl - (nPartTotl * nPartDisc / 100) + nFreightx - nPartPaid) xPayablex" +
                             ", sSourceCd" +
                             ", sSourceNo" +
                         " FROM Job_Order_Master" +
@@ -770,8 +770,8 @@ public class SalesInvoice implements XPayments{
                 lsSQL = "SELECT" +
                         "  IFNULL(c.sClientNm, '') sClientNm" +
                         ", a.nPartTotl nTranTotl" +
-                        ", a.nDiscount" +
-                        ", a.nAddDiscx" +
+                        ", a.nPartDisc nDiscount" +
+                        ", 0.00 nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nPartPaid nAmtPaidx" +
                         ", 0.00 nDeductnx" +
