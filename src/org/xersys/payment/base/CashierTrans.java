@@ -136,7 +136,7 @@ public class CashierTrans {
                             " ON a.sSalesman = c.sClientID" +
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
                         " AND a.cTranStat IN ('0', '1')" +
-                    " HAVING xPayablex > 0.00";
+                    " HAVING xPayablex >= 0.00";
         }
         
         if (p_sSourceCd.contains("CO")){
@@ -163,7 +163,7 @@ public class CashierTrans {
                                 " AND a.sTransNox = b.sTransNox" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
                         " AND a.cTranStat = '0'" +
-                    " HAVING xPayablex > 0.00";
+                    " HAVING xPayablex >= 0.00";
         }
         
         if (p_sSourceCd.contains("WS")){
@@ -190,7 +190,7 @@ public class CashierTrans {
                                 " AND a.sTransNox = b.sTransNox" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
                         " AND a.cTranStat IN ('0', '1')" +
-                    " HAVING xPayablex > 0.00";
+                    " HAVING xPayablex >= 0.00";
         }
         
         if (p_sSourceCd.contains("JO")){
@@ -219,7 +219,7 @@ public class CashierTrans {
                            " ON a.sMechanic = c.sClientID" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
                         " AND a.cTranStat IN ('0', '1')" +
-                    " HAVING xPayablex > 0.00";
+                    " HAVING xPayablex >= 0.00";
         }
         
         return lsSQL;
