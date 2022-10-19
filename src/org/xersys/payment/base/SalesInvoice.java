@@ -3,8 +3,6 @@ package org.xersys.payment.base;
 import com.mysql.jdbc.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.sql.rowset.CachedRowSet;
 import javax.sql.rowset.RowSetFactory;
 import javax.sql.rowset.RowSetProvider;
@@ -101,7 +99,8 @@ public class SalesInvoice implements XPayments{
                 p_oMaster.updateObject("nDiscount", loRS1.getDouble("nDiscount"));
                 p_oMaster.updateObject("nAddDiscx", loRS1.getDouble("nAddDiscx"));
                 p_oMaster.updateObject("nFreightx", loRS1.getDouble("nFreightx"));
-                p_oMaster.updateObject("nAmtPaidx", loRS1.getDouble("nAmtPaidx"));                
+                p_oMaster.updateObject("nAmtPaidx", loRS1.getDouble("nAmtPaidx"));    
+                p_oMaster.updateObject("nAdvPaymx", loRS1.getDouble("nDeductnx"));    
                 p_oMaster.updateObject("cTranStat", TransactionStatus.STATE_OPEN);    
                 p_oMaster.updateRow();
                 
@@ -156,8 +155,14 @@ public class SalesInvoice implements XPayments{
             }
             
             p_oMaster.first();
-            if (p_oMaster.getString("sClientID").isEmpty()){
+            if (p_oMaster.getString("sClientID").isEmpty() &&
+                p_oMaster.getString("sClientNm").isEmpty()){
                 setMessage("Client must not be empty.");
+                return false;
+            }
+            
+            if (p_oMaster.getString("sInvNumbr").isEmpty()){
+                setMessage("OR number is not set..");
                 return false;
             }
             
@@ -193,9 +198,8 @@ public class SalesInvoice implements XPayments{
                     return false;
                 }
                 
-                lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Sales_Invoice", "sClientNm;nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
+                lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Sales_Invoice", "nTranTotl;nDiscount;nAddDiscx;nFreightx;nAmtPaidx");
             } else {
-                
             }
             
             if (lsSQL.equals("")){
@@ -237,8 +241,48 @@ public class SalesInvoice implements XPayments{
 
     @Override
     public boolean OpenTransaction(String fsTransNox) {
-        System.out.println(this.getClass().getSimpleName() + ".OpenRecord()");
+        String lsProcName = this.getClass().getSimpleName() + ".OpenTransaction(String fsTransNox)";
+        System.out.println(lsProcName);
         
+        if (p_oNautilus == null){
+            p_sMessagex = "Application driver is not set.";
+            return false;
+        }
+        
+        try {
+            RowSetFactory factory = RowSetProvider.newFactory();
+
+            //create empty master record
+            String lsSQL = MiscUtil.addCondition(getSQ_Master(), "a.sTransNox = " + SQLUtil.toSQL(fsTransNox));
+            ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
+            
+            if (MiscUtil.RecordCount(loRS) == 0){
+                setMessage("No record found."); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+            
+            p_oMaster = factory.createCachedRowSet();
+            p_oMaster.populate(loRS);
+            MiscUtil.close(loRS);
+            
+            p_oCard = new CreditCardTrans(p_oNautilus, p_sBranchCd, true);
+            if (!p_oCard.NewTransaction()){
+                setMessage(p_oCard.getMessage()); 
+                p_nEditMode = EditMode.UNKNOWN;
+                return false;
+            }
+            
+            computePaymentTotal();
+            computeTax();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            setMessage("SQL Exception on " + lsProcName); 
+            p_nEditMode = EditMode.UNKNOWN;
+            return false;
+        }
+
+        p_nEditMode = EditMode.READY;
         return true;
     }
     
@@ -329,6 +373,13 @@ public class SalesInvoice implements XPayments{
                     break;
                 case "sClientID":
                     getClient("a.sClientID", foValue);
+                    break;
+                case "sClientNm":
+                    p_oMaster.first();
+                    p_oMaster.updateObject(fsFieldNm, (String) foValue);
+                    p_oMaster.updateRow();
+                    
+                    if (p_oListener != null) p_oListener.MasterRetreive("sClientID", (String) p_oMaster.getObject("sClientNm"));
                     break;
                 case "nVATSales":
                 case "nVATAmtxx":
@@ -463,7 +514,7 @@ public class SalesInvoice implements XPayments{
         switch(p_sSourceCd){
             case "SO":
                 lsSQL = "SELECT" +
-                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx) xPayablex" +
+                            " (nTranTotl - ((nTranTotl * nDiscount / 100) + nAddDiscx) + nFreightx - nAmtPaidx - nDeductnx) xPayablex" +
                         " FROM SP_Sales_Master" +
                         " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
                 
@@ -531,6 +582,37 @@ public class SalesInvoice implements XPayments{
                     }
                 }
                 break;
+            case "JO":
+                lsSQL = "SELECT" +
+                            " (nPartTotl - (nPartTotl * nPartDisc / 100) + nFreightx - nPartPaid) xPayablex" +
+                            ", sSourceCd" +
+                            ", sSourceNo" +
+                        " FROM Job_Order_Master" +
+                        " WHERE sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                
+                loRS = p_oNautilus.executeQuery(lsSQL);
+                if (loRS.next()){                    
+                    lsSQL = "UPDATE Job_Order_Master SET" +
+                            "  nAmtPaidx = nAmtPaidx + " + lnPaymTotl +
+                            ", nPartPaid = nPartPaid + " + lnPaymTotl;
+                    
+                    lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
+                    
+                    if (!lsSQL.isEmpty()){
+                        if(p_oNautilus.executeUpdate(lsSQL, "Job_Order_Master", p_sBranchCd, "") <= 0){
+                            if(!p_oNautilus.getMessage().isEmpty())
+                                setMessage(p_oNautilus.getMessage());
+                            else
+                                setMessage("Unable to update source transaction.");
+
+                            return false;
+                        }
+                    }
+                                       
+                    MiscUtil.close(loRS);
+                    return true;
+                }
+                break;    
         }
         
         setMessage("Unable to update source transaction.");
@@ -565,32 +647,30 @@ public class SalesInvoice implements XPayments{
     }
      
     private Number computeTotal() throws SQLException{
-        double lnTranTotl = (double) p_oMaster.getObject("nTranTotl");
-        double lnDiscount = (double) p_oMaster.getObject("nDiscount");
-        double lnAddDiscx = (double) p_oMaster.getObject("nAddDiscx");
-        double lnFreightx = (double) p_oMaster.getObject("nFreightx");
-        double lnAmtPaidx = (double) p_oMaster.getObject("nAmtPaidx");
+        p_oMaster.first();
+        double lnTranTotl = p_oMaster.getDouble("nTranTotl");
+        double lnDiscount = p_oMaster.getDouble("nDiscount");
+        double lnAddDiscx = p_oMaster.getDouble("nAddDiscx");
+        double lnFreightx = p_oMaster.getDouble("nFreightx");
+        double lnAmtPaidx = p_oMaster.getDouble("nAmtPaidx");
 
         return Math.round((lnTranTotl + lnFreightx - lnAmtPaidx - ((lnTranTotl * lnDiscount / 100) + lnAddDiscx)) * 100.0) / 100.0;
     }
     
     private double computePaymentTotal() throws SQLException{
-        return (double) p_oMaster.getObject("nCashAmtx") +
-                            p_oCard.getPaymentTotal();
+        return Double.valueOf(String.valueOf(getMaster("nCashAmtx"))) +
+                p_oCard.getPaymentTotal();
     }
     
-    private void computeTax() throws SQLException{
-        p_oMaster.first();
-        
-        double lnCashAmtx = (double) p_oMaster.getObject("nCashAmtx");
-        double lnAdvPaymx = (double) p_oMaster.getObject("nAdvPaymx");
+    private void computeTax() throws SQLException{        
+        double lnCashAmtx = Double.valueOf(String.valueOf(getMaster("nCashAmtx")));
         double lnCardPaym = p_oCard.getPaymentTotal();
         
         //todo:
         //  get card total; get check total; get gc total
         //  then add to the transaction total
         
-        double lnTranTotl = lnCashAmtx + lnAdvPaymx + lnCardPaym;
+        double lnTranTotl = lnCashAmtx + lnCardPaym;
         
         double lnNonVATSl = 0.00;
         double lnZroVATSl = 0.00;
@@ -599,6 +679,7 @@ public class SalesInvoice implements XPayments{
         double lnVATSales = lnTranTotl / (1 + VAT_RATE);
         double lnVATAmtxx = lnVATSales * VAT_RATE;
         
+        p_oMaster.first();
         p_oMaster.updateObject("nVATSales", Math.round(lnVATSales * 100.0) / 100.0);
         p_oMaster.updateObject("nVATAmtxx", Math.round(lnVATAmtxx * 100.0) / 100.0);
         p_oMaster.updateObject("nNonVATSl", Math.round(lnNonVATSl * 100.0) / 100.0);
@@ -606,10 +687,10 @@ public class SalesInvoice implements XPayments{
         p_oMaster.updateObject("nCWTAmtxx", Math.round(lnCWTAmtxx * 100.0) / 100.0);
         p_oMaster.updateRow();
         
-        p_oListener.MasterRetreive("nVATSales", p_oMaster.getObject("nVATSales"));
-        p_oListener.MasterRetreive("nVATAmtxx", p_oMaster.getObject("nVATAmtxx"));
-        p_oListener.MasterRetreive("nNonVATSl", p_oMaster.getObject("nNonVATSl"));
-        p_oListener.MasterRetreive("nZroVATSl", p_oMaster.getObject("nZroVATSl"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nVATSales", getMaster("nVATSales"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nVATAmtxx", getMaster("nVATAmtxx"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nNonVATSl", getMaster("nNonVATSl"));
+        if (p_oListener != null) p_oListener.MasterRetreive("nZroVATSl", getMaster("nZroVATSl"));
     }
     
     private String getSQ_Master(){
@@ -630,7 +711,7 @@ public class SalesInvoice implements XPayments{
                     ", a.sSourceNo" +
                     ", a.cTranStat" +
                     ", a.dModified" +
-                    ", IFNULL(b.sClientNm, '') sClientNm" +
+                    ", IFNULL(b.sClientNm, a.sClientNm) sClientNm" +
                     ", c.nTranTotl" +
                     ", c.nDiscount" +
                     ", c.nAddDiscx" +
@@ -653,6 +734,7 @@ public class SalesInvoice implements XPayments{
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
+                        ", a.nDeductnx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
@@ -672,12 +754,33 @@ public class SalesInvoice implements XPayments{
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
+                        ", 0.00 nDeductnx" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", a.sClientID" +
                     " FROM WholeSale_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'WS'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                        " LEFT JOIN Client_Master c" + 
+                            " ON a.sClientID = c.sClientID" +
+                    " WHERE a.sTransNox = " + SQLUtil.toSQL(p_sSourceNo);
+                break;
+            case "JO":
+                lsSQL = "SELECT" +
+                        "  IFNULL(c.sClientNm, '') sClientNm" +
+                        ", a.nPartTotl nTranTotl" +
+                        ", a.nPartDisc nDiscount" +
+                        ", 0.00 nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nPartPaid nAmtPaidx" +
+                        ", 0.00 nDeductnx" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", a.sClientID" +
+                    " FROM Job_Order_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'JO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sClientID = c.sClientID" +

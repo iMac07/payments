@@ -68,7 +68,6 @@ public class CashierTrans {
         String lsSQL = getSQ_Master();
         
         ResultSet loRS = p_oNautilus.executeQuery(lsSQL);
-        loRS = p_oNautilus.executeQuery(lsSQL);
         
         if (MiscUtil.RecordCount(loRS) == 0){
             p_sMessagex = "No Transaction to Pay/Release at this time.";
@@ -126,7 +125,9 @@ public class CashierTrans {
                         ", IFNULL(c.sClientNm, '') sClientNm" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
-                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx + a.nOthChrge - a.nDeductnx - a.nAmtPaidx) xPayablex" +
+                        ", a.nOthChrge" +
+                        ", a.nDeductnx" +
                     " FROM SP_Sales_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
@@ -134,13 +135,41 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sSalesman = c.sClientID" +
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex >= 0.00";
+        }
+        
+        if (p_sSourceCd.contains("CO")){
+            if (!lsSQL.isEmpty()) lsSQL += " UNION ";
+            
+            lsSQL += "SELECT" +
+                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        ", 'Customer Order' sTranType" +
+                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", a.nTranTotl" +
+                        ", a.nDiscount" +
+                        ", a.nAddDiscx" +
+                        ", a.nFreightx" +
+                        ", a.nAmtPaidx" +
+                        ", '' sClientNm" +
+                        ", b.sSourceCd" +
+                        ", a.sTransNox" +
+                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                        ", 0.00 nOthChrge" +
+                        ", 0.00 nDeductnx" +
+                    " FROM SP_Sales_Order_Master a" +
+                        " LEFT JOIN xxxTempTransactions b" +
+                            " ON b.sSourceCd = 'CO'" +
+                                " AND a.sTransNox = b.sTransNox" + 
+                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
+                        " AND a.cTranStat = '0'" +
+                    " HAVING xPayablex >= 0.00";
         }
         
         if (p_sSourceCd.contains("WS")){
             if (!lsSQL.isEmpty()) lsSQL += " UNION ";
             
-            lsSQL = "SELECT" +
+            lsSQL += "SELECT" +
                         "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
                         ", 'Whole Sale' sTranType" +
                         ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
@@ -153,12 +182,15 @@ public class CashierTrans {
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
+                        ", 0.00 nOthChrge" +
+                        ", 0.00 nDeductnx" +
                     " FROM WholeSale_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'WS'" +
                                 " AND a.sTransNox = b.sTransNox" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex >= 0.00";
         }
         
         if (p_sSourceCd.contains("JO")){
@@ -169,14 +201,16 @@ public class CashierTrans {
                         ", 'Job Order' sTranType" +
                         ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
                         ", a.nTranTotl" +
-                        ", a.nDiscount" +
-                        ", a.nAddDiscx" +
+                        ", 0.00 nDiscount" +
+                        ", 0.00 nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
                         ", IFNULL(c.sClientNm, '') sClientNm" +
                         ", b.sSourceCd" +
                         ", a.sTransNox" +
-                        ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" + 
+                        ", a.nTranTotl + a.nFreightx - a.nAmtPaidx xPayablex" + 
+                        ", 0.00 nOthChrge" +
+                        ", 0.00 nDeductnx" +
                     " FROM Job_Order_Master a" + 
                         " LEFT JOIN xxxTempTransactions b" + 
                            " ON b.sSourceCd = 'JO'" + 
@@ -184,7 +218,8 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                            " ON a.sMechanic = c.sClientID" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')";
+                        " AND a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex >= 0.00";
         }
         
         return lsSQL;
