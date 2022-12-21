@@ -128,6 +128,7 @@ public class CashierTrans {
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx + a.nOthChrge - a.nDeductnx - a.nAmtPaidx) xPayablex" +
                         ", a.nOthChrge" +
                         ", a.nDeductnx" +
+                        ", a.cTranStat" +
                     " FROM SP_Sales_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'SO'" +
@@ -135,8 +136,8 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sSalesman = c.sClientID" +
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')" +
                     " HAVING xPayablex >= 0.00";
+                    //" AND a.cTranStat IN ('0', '1')" +
         }
         
         if (p_sSourceCd.contains("CO")){
@@ -157,6 +158,7 @@ public class CashierTrans {
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
                         ", 0.00 nOthChrge" +
                         ", 0.00 nDeductnx" +
+                        ", a.cTranStat" +
                     " FROM SP_Sales_Order_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'CO'" +
@@ -184,6 +186,7 @@ public class CashierTrans {
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
                         ", 0.00 nOthChrge" +
                         ", 0.00 nDeductnx" +
+                        ", a.cTranStat" +
                     " FROM WholeSale_Master a" +
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'WS'" +
@@ -211,6 +214,7 @@ public class CashierTrans {
                         ", a.nTranTotl + a.nFreightx - a.nAmtPaidx xPayablex" + 
                         ", 0.00 nOthChrge" +
                         ", 0.00 nDeductnx" +
+                        ", a.cTranStat" +
                     " FROM Job_Order_Master a" + 
                         " LEFT JOIN xxxTempTransactions b" + 
                            " ON b.sSourceCd = 'JO'" + 
@@ -218,8 +222,8 @@ public class CashierTrans {
                         " LEFT JOIN Client_Master c" + 
                            " ON a.sMechanic = c.sClientID" + 
                     " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')" +
-                    " HAVING xPayablex >= 0.00";
+                    " HAVING xPayablex >= 0.00 AND a.cTranStat <> '4'";
+                    //" AND a.cTranStat IN ('0', '1')" +
         }
         
         return lsSQL;

@@ -310,14 +310,18 @@ public class ChargeInvoice implements XPayments{
                 
                 loRS = p_oNautilus.executeQuery(lsSQL);
                 if (loRS.next()){                    
-                    lsSQL = "UPDATE SP_Sales_Master SET" +
-                            "  nAmtPaidx = nAmtPaidx + " + loRS.getDouble("xPayablex") +
-                            ", sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID"));
+//                    lsSQL = "UPDATE SP_Sales_Master SET" +
+//                            "  nAmtPaidx = nAmtPaidx + " + loRS.getDouble("xPayablex") +
+//                            ", sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID"));
                     
-                    if (loRS.getDouble("xPayablex") <= loRS.getDouble("xPayablex"))
-                        lsSQL += ", cTranStat = '2'";
-                    else 
-                        lsSQL += ", cTranStat = '1'";
+                    lsSQL = "UPDATE SP_Sales_Master SET" +
+                            "  sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID")) +
+                            ", cTranStat = '2'";
+                    
+//                    if (loRS.getDouble("xPayablex") <= loRS.getDouble("xPayablex"))
+//                        lsSQL += ", cTranStat = '2'";
+//                    else 
+//                        lsSQL += ", cTranStat = '1'";
                     
                     lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
                     
@@ -345,14 +349,17 @@ public class ChargeInvoice implements XPayments{
                 
                 loRS = p_oNautilus.executeQuery(lsSQL);
                 if (loRS.next()){                    
-                    lsSQL = "UPDATE WholeSale_Master SET" +
-                            "  nAmtPaidx = nAmtPaidx + " + loRS.getDouble("xPayablex") +
-                            ", sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID"));
+//                    lsSQL = "UPDATE WholeSale_Master SET" +
+//                            "  nAmtPaidx = nAmtPaidx + " + loRS.getDouble("xPayablex") +
+//                            ", sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID"));
+                    lsSQL = "UPDATE WholeSale_Master SET" +                            
+                            "  sClientID = " + SQLUtil.toSQL(p_oMaster.getString("sClientID")) +
+                            ", cTranStat = '2'";
                     
-                    if (loRS.getDouble("xPayablex") <= loRS.getDouble("xPayablex"))
-                        lsSQL += ", cTranStat = '2'";
-                    else 
-                        lsSQL += ", cTranStat = '1'";
+//                    if (loRS.getDouble("xPayablex") <= loRS.getDouble("xPayablex"))
+//                        lsSQL += ", cTranStat = '2'";
+//                    else 
+//                        lsSQL += ", cTranStat = '1'";
                     
                     lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
                     
