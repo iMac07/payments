@@ -114,9 +114,9 @@ public class CashierTrans {
         
         if (p_sSourceCd.contains("SO")){
             lsSQL = "SELECT" +
-                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        "  a.dTransact" +
                         ", 'Sales Order' sTranType" +
-                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", IFNULL(CONCAT(b.sSourceCd, ' - ', b.sOrderNox), 'BACKDATE') sOrderNox" +
                         ", a.nTranTotl" +
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
@@ -135,9 +135,16 @@ public class CashierTrans {
                                 " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
                             " ON a.sSalesman = c.sClientID" +
-                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                    " HAVING xPayablex >= 0.00";
-                    //" AND a.cTranStat IN ('0', '1')" +
+                    " WHERE a.cTranStat = '0'" +
+                    " HAVING xPayablex > 0.00";
+            
+            //show back date transactions for payment
+            if (!System.getProperty("app.sales.allow.backdate").equals("1")){
+                lsSQL = MiscUtil.addCondition(lsSQL, "DATE_FORMAT(a.dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)));
+            }
+            //"  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+            //" AND a.cTranStat IN ('0', '1')" +
+            //" HAVING xPayablex >= 0.00"
         }
         
         if (p_sSourceCd.contains("CO")){
