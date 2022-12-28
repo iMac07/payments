@@ -505,7 +505,7 @@ public class OfficialReceipt implements XPayments{
         }
     }
     
-    private boolean updateSource() throws SQLException{
+     private boolean updateSource() throws SQLException{
         String lsSQL = "";
         ResultSet loRS;
         
@@ -527,13 +527,14 @@ public class OfficialReceipt implements XPayments{
                     
                     if (lnPaymTotl > 0.00){
                         lsSQL += ", nForCredt = nForCredt + " + lnPaymTotl +
-                                    ", nAvailBal = nAvailBal + " + lnPaymTotl;
+                                    ", nAvailBal = nAvailBal + " + lnPaymTotl +
+                                    ", cTranStat = '1'";
                     }
                     
-                    if (loRS.getDouble("xPayablex") <= lnPaymTotl)
-                        lsSQL += ", cTranStat = '2'";
-                    else 
-                        lsSQL += ", cTranStat = '1'";
+//                    if (loRS.getDouble("xPayablex") <= lnPaymTotl)
+//                        lsSQL += ", cTranStat = '2'";
+//                    else 
+//                        lsSQL += ", cTranStat = '1'";
                     
                     MiscUtil.close(loRS);
                     lsSQL = MiscUtil.addCondition(lsSQL, "sTransNox = " + SQLUtil.toSQL(p_sSourceNo));
