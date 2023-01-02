@@ -123,7 +123,7 @@ public class CashierTrans {
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
                         ", IFNULL(c.sClientNm, '') sClientNm" +
-                        ", b.sSourceCd" +
+                        ", IFNULL(b.sSourceCd, 'SO') sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx + a.nOthChrge - a.nDeductnx - a.nAmtPaidx) xPayablex" +
                         ", a.nOthChrge" +
@@ -151,16 +151,16 @@ public class CashierTrans {
             if (!lsSQL.isEmpty()) lsSQL += " UNION ";
             
             lsSQL += "SELECT" +
-                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        "  a.dTransact" +
                         ", 'Customer Order' sTranType" +
-                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", IFNULL(CONCAT(b.sSourceCd, ' - ', b.sOrderNox), 'BACKDATE') sOrderNox" +
                         ", a.nTranTotl" +
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
                         ", '' sClientNm" +
-                        ", b.sSourceCd" +
+                        ", IFNULL(b.sSourceCd, 'CO') sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
                         ", 0.00 nOthChrge" +
@@ -170,25 +170,29 @@ public class CashierTrans {
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'CO'" +
                                 " AND a.sTransNox = b.sTransNox" + 
-                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat = '0'" +
-                    " HAVING xPayablex >= 0.00";
+                    " WHERE a.cTranStat = '0'" +
+                    " HAVING xPayablex > 0.00";
+            
+            //show back date transactions for payment
+            if (!System.getProperty("app.sales.allow.backdate").equals("1")){
+                lsSQL = MiscUtil.addCondition(lsSQL, "DATE_FORMAT(a.dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)));
+            }
         }
         
         if (p_sSourceCd.contains("WS")){
             if (!lsSQL.isEmpty()) lsSQL += " UNION ";
             
             lsSQL += "SELECT" +
-                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        "  a.dTransact" +
                         ", 'Whole Sale' sTranType" +
-                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", IFNULL(CONCAT(b.sSourceCd, ' - ', b.sOrderNox), 'BACKDATE') sOrderNox" +
                         ", a.nTranTotl" +
                         ", a.nDiscount" +
                         ", a.nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
                         ", 'N-O-N-E' sClientNm" +
-                        ", b.sSourceCd" +
+                        ", IFNULL(b.sSourceCd, 'WS') sSourceCd" +
                         ", a.sTransNox" +
                         ", (a.nTranTotl - ((a.nTranTotl * a.nDiscount / 100) + a.nAddDiscx) + a.nFreightx - a.nAmtPaidx) xPayablex" +
                         ", 0.00 nOthChrge" +
@@ -198,25 +202,29 @@ public class CashierTrans {
                         " LEFT JOIN xxxTempTransactions b" +
                             " ON b.sSourceCd = 'WS'" +
                                 " AND a.sTransNox = b.sTransNox" + 
-                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                        " AND a.cTranStat IN ('0', '1')" +
-                    " HAVING xPayablex >= 0.00";
+                    " WHERE a.cTranStat IN ('0', '1')" +
+                    " HAVING xPayablex > 0.00";
+            
+            //show back date transactions for payment
+            if (!System.getProperty("app.sales.allow.backdate").equals("1")){
+                lsSQL = MiscUtil.addCondition(lsSQL, "DATE_FORMAT(a.dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)));
+            }
         }
         
         if (p_sSourceCd.contains("JO")){
             if (!lsSQL.isEmpty()) lsSQL += " UNION ";
             
             lsSQL += "SELECT" + 
-                        "  IFNULL(a.dCreatedx, a.dTransact) dTransact" +
+                        "  a.dTransact" +
                         ", 'Job Order' sTranType" +
-                        ", CONCAT(b.sSourceCd, ' - ', b.sOrderNox) sOrderNox" +
+                        ", IFNULL(CONCAT(b.sSourceCd, ' - ', b.sOrderNox), 'BACKDATE') sOrderNox" +
                         ", a.nTranTotl" +
                         ", 0.00 nDiscount" +
                         ", 0.00 nAddDiscx" +
                         ", a.nFreightx" +
                         ", a.nAmtPaidx" +
                         ", IFNULL(c.sClientNm, '') sClientNm" +
-                        ", b.sSourceCd" +
+                        ", IFNULL(b.sSourceCd, 'JO') sSourceCd" +
                         ", a.sTransNox" +
                         ", a.nTranTotl + a.nFreightx - a.nAmtPaidx xPayablex" + 
                         ", 0.00 nOthChrge" +
@@ -228,9 +236,13 @@ public class CashierTrans {
                            " AND a.sTransNox = b.sTransNox" + 
                         " LEFT JOIN Client_Master c" + 
                            " ON a.sMechanic = c.sClientID" + 
-                    " WHERE DATE_FORMAT(dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)) +
-                    " HAVING xPayablex >= 0.00 AND a.cTranStat <> '4'";
+                    " HAVING xPayablex > 0.00 AND a.cTranStat <> '4'";
                     //" AND a.cTranStat IN ('0', '1')" +
+                    
+            //show back date transactions for payment
+            if (!System.getProperty("app.sales.allow.backdate").equals("1")){
+                lsSQL = MiscUtil.addCondition(lsSQL, "DATE_FORMAT(a.dTransact, '%Y-%m-%d') = " + SQLUtil.toSQL(SQLUtil.dateFormat(p_oNautilus.getServerDate(), SQLUtil.FORMAT_SHORT_DATE)));
+            }
         }
         
         return lsSQL;
